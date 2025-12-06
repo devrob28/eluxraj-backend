@@ -13,7 +13,7 @@ from app.core.exceptions import (
     sqlalchemy_exception_handler,
     generic_exception_handler
 )
-from app.api.endpoints import auth, signals, oracle
+from app.api.endpoints import auth, signals, oracle, alerts
 from app.services.scheduler import start_scheduler, stop_scheduler, get_scheduled_jobs
 
 # Setup logging
@@ -39,13 +39,7 @@ app.add_middleware(RateLimitMiddleware, requests_per_minute=100)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://eluxraj.ai",
-        "https://www.eluxraj.ai",
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "*"  # Allow all for mobile apps
-    ],
+    allow_origins=["https://eluxraj.ai", "http://localhost:3000", "http://localhost:5173", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,12 +49,12 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(signals.router, prefix="/api/v1/signals", tags=["Signals"])
 app.include_router(oracle.router, prefix="/api/v1/oracle", tags=["Oracle Engine"])
+app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["Alerts"])
 
 @app.on_event("startup")
 async def startup_event():
     logger.info(f"🚀 Starting {settings.APP_NAME} v{settings.VERSION}")
     
-    # Create tables on startup
     from app.db.base import Base
     from app.db.session import engine
     from app.models.user import User
@@ -68,7 +62,6 @@ async def startup_event():
     Base.metadata.create_all(bind=engine)
     logger.info("✅ Database tables ready")
     
-    # Start scheduler
     start_scheduler()
 
 @app.on_event("shutdown")
@@ -82,7 +75,6 @@ async def root():
         "name": settings.APP_NAME,
         "version": settings.VERSION,
         "status": "operational",
-        "docs": "/docs",
     }
 
 @app.get("/health", tags=["Health"])

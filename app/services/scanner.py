@@ -1,22 +1,26 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
 from app.services.oracle import oracle
+from app.services.email import email_service
 from app.models.signal import Signal
+from app.models.user import User
 from app.core.logging import logger
 
 class SignalScanner:
     """Automatically scan markets and save signals"""
     
-    MIN_SCORE_TO_SAVE = 55  # Save signals with score >= 55 or <= 45
+    MIN_SCORE_TO_SAVE = 55
+    MIN_SCORE_TO_ALERT = 70  # Only alert for high-confidence signals
     
     async def scan_and_save(self, db: Session) -> dict:
         """Scan all assets and save actionable signals"""
         
-        logger.info("Starting automated market scan...")
+        logger.info("🔍 Starting automated market scan...")
         
         saved_signals = []
         skipped = []
         errors = []
+        alerts_sent = 0
         
         for symbol in oracle.SUPPORTED_ASSETS:
             try:
@@ -58,12 +62,17 @@ class SignalScanner:
                         "score": score,
                     })
                     
-                    logger.info(f"Saved: {symbol} - {signal_data['signal_type']} - Score: {score}")
+                    logger.info(f"💾 Saved: {symbol} - {signal_data['signal_type']} - Score: {score}")
+                    
+                    # Send alerts for high-confidence signals
+                    if score >= self.MIN_SCORE_TO_ALERT and email_service.is_enabled():
+                        alert_count = await self._send_alerts_to_users(db, signal_data)
+                        alerts_sent += alert_count
                 else:
                     skipped.append({"symbol": symbol, "score": score, "reason": "Score not actionable"})
                     
             except Exception as e:
-                logger.error(f"Error scanning {symbol}: {e}")
+                logger.error(f"❌ Error scanning {symbol}: {e}")
                 errors.append({"symbol": symbol, "error": str(e)})
         
         db.commit()
@@ -74,11 +83,40 @@ class SignalScanner:
             "saved": len(saved_signals),
             "skipped": len(skipped),
             "errors": len(errors),
+            "alerts_sent": alerts_sent,
             "saved_signals": saved_signals,
         }
         
-        logger.info(f"Scan complete: {result['saved']} signals saved")
+        logger.info(f"✅ Scan complete: {result['saved']} signals saved, {alerts_sent} alerts sent")
         
         return result
+    
+    async def _send_alerts_to_users(self, db: Session, signal_data: dict) -> int:
+        """Send email alerts to subscribed users"""
+        
+        # Get users who have alerts enabled and are Pro/Elite
+        users = db.query(User).filter(
+            User.email_alerts == True,
+            User.is_active == True,
+            User.subscription_tier.in_(["pro", "elite"])
+        ).all()
+        
+        sent_count = 0
+        
+        for user in users:
+            try:
+                success = await email_service.send_signal_alert(
+                    user.email,
+                    user.full_name,
+                    signal_data
+                )
+                if success:
+                    sent_count += 1
+                    logger.info(f"📧 Alert sent to {user.email}")
+            except Exception as e:
+                logger.error(f"❌ Failed to send alert to {user.email}: {e}")
+        
+        return sent_count
+
 
 scanner = SignalScanner()
