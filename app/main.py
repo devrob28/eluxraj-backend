@@ -13,7 +13,7 @@ from app.core.exceptions import (
     sqlalchemy_exception_handler,
     generic_exception_handler
 )
-from app.api.endpoints import auth, signals, oracle, alerts, admin, admin_ui
+from app.api.endpoints import auth, signals, oracle, alerts, admin, admin_ui, legal, transparency
 from app.services.scheduler import start_scheduler, stop_scheduler, get_scheduled_jobs
 
 setup_logging(debug=settings.DEBUG)
@@ -47,7 +47,9 @@ app.include_router(signals.router, prefix="/api/v1/signals", tags=["Signals"])
 app.include_router(oracle.router, prefix="/api/v1/oracle", tags=["Oracle Engine"])
 app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["Alerts"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
+app.include_router(transparency.router, prefix="/api/v1/transparency", tags=["Transparency"])
 app.include_router(admin_ui.router, prefix="/admin", tags=["Admin UI"])
+app.include_router(legal.router, prefix="/legal", tags=["Legal"])
 
 @app.on_event("startup")
 async def startup_event():
@@ -66,18 +68,21 @@ async def shutdown_event():
 
 @app.get("/", tags=["Health"])
 async def root():
-    return {"name": settings.APP_NAME, "version": settings.VERSION, "status": "operational", "admin": "/admin"}
+    return {
+        "name": settings.APP_NAME,
+        "version": settings.VERSION,
+        "status": "operational",
+        "links": {
+            "docs": "/docs",
+            "admin": "/admin",
+            "transparency": "/api/v1/transparency/summary",
+            "terms": "/legal/terms",
+            "privacy": "/legal/privacy",
+            "disclaimer": "/legal/disclaimer",
+            "methodology": "/legal/methodology",
+        }
+    }
 
 @app.get("/health", tags=["Health"])
 async def health_check():
     return {"status": "healthy", "version": settings.VERSION}
-
-@app.get("/scheduler/jobs", tags=["Scheduler"])
-async def get_jobs():
-    return {"jobs": get_scheduled_jobs()}
-
-@app.post("/scheduler/scan-now", tags=["Scheduler"])
-async def trigger_scan_now():
-    from app.services.scheduler import scheduled_market_scan
-    result = await scheduled_market_scan()
-    return {"triggered": True, "result": result}
