@@ -13,7 +13,7 @@ from app.core.exceptions import (
     sqlalchemy_exception_handler,
     generic_exception_handler
 )
-from app.api.endpoints import auth, signals, oracle, alerts, admin, admin_ui, legal, transparency
+from app.api.endpoints import auth, signals, oracle, alerts, admin, admin_ui, legal, transparency, content
 from app.services.scheduler import start_scheduler, stop_scheduler, get_scheduled_jobs
 
 setup_logging(debug=settings.DEBUG)
@@ -41,13 +41,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routes
+# API Routes
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(signals.router, prefix="/api/v1/signals", tags=["Signals"])
 app.include_router(oracle.router, prefix="/api/v1/oracle", tags=["Oracle Engine"])
 app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["Alerts"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(transparency.router, prefix="/api/v1/transparency", tags=["Transparency"])
+app.include_router(content.router, prefix="/api/v1/content", tags=["Content & Marketing"])
+
+# Page Routes
 app.include_router(admin_ui.router, prefix="/admin", tags=["Admin UI"])
 app.include_router(legal.router, prefix="/legal", tags=["Legal"])
 
@@ -72,10 +75,14 @@ async def root():
         "name": settings.APP_NAME,
         "version": settings.VERSION,
         "status": "operational",
+        "disclaimer": "ELUXRAJ provides informational AI signals — not financial advice. Do not trade with money you cannot afford to lose.",
         "links": {
             "docs": "/docs",
             "admin": "/admin",
             "transparency": "/api/v1/transparency/summary",
+            "verified_results": "/api/v1/content/verified-results",
+            "how_it_works": "/api/v1/content/how-oracle-works",
+            "team": "/api/v1/content/team",
             "terms": "/legal/terms",
             "privacy": "/legal/privacy",
             "disclaimer": "/legal/disclaimer",
