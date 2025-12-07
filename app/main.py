@@ -13,7 +13,7 @@ from app.core.exceptions import (
     sqlalchemy_exception_handler,
     generic_exception_handler
 )
-from app.api.endpoints import auth, signals, oracle, alerts, admin, admin_ui, legal, transparency, content, public
+from app.api.endpoints import auth, signals, oracle, alerts, admin, admin_ui, legal, transparency, content, public, marketing
 from app.services.scheduler import start_scheduler, stop_scheduler, get_scheduled_jobs
 
 setup_logging(debug=settings.DEBUG)
@@ -41,7 +41,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Public Pages (no auth)
+# Public Pages
 app.include_router(public.router, prefix="/track", tags=["Public Tracker"])
 app.include_router(legal.router, prefix="/legal", tags=["Legal"])
 
@@ -53,6 +53,7 @@ app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["Alerts"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(transparency.router, prefix="/api/v1/transparency", tags=["Transparency"])
 app.include_router(content.router, prefix="/api/v1/content", tags=["Content"])
+app.include_router(marketing.router, prefix="/api/v1/marketing", tags=["Marketing"])
 
 # Admin UI
 app.include_router(admin_ui.router, prefix="/admin", tags=["Admin UI"])
@@ -83,15 +84,9 @@ async def root():
         "public_tracker": "/track",
         "links": {
             "public_dashboard": "/track",
+            "homepage_copy": "/api/v1/marketing/homepage",
             "api_docs": "/docs",
-            "admin": "/admin",
-            "report_card": "/track/api/report-card",
-            "limitations": "/track/why-we-might-be-wrong",
-            "how_it_works": "/api/v1/content/how-oracle-works",
-            "team": "/api/v1/content/team",
-            "terms": "/legal/terms",
-            "privacy": "/legal/privacy",
-            "disclaimer": "/legal/disclaimer",
+            "admin": "/admin"
         }
     }
 
