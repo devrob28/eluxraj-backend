@@ -13,7 +13,7 @@ from app.core.exceptions import (
     sqlalchemy_exception_handler,
     generic_exception_handler
 )
-from app.api.endpoints import auth, signals, oracle, alerts, admin, admin_ui, legal, transparency, content, public, marketing
+from app.api.endpoints import auth, signals, oracle, alerts, admin, admin_ui, legal, transparency, content, public, marketing, chart_analysis
 from app.services.scheduler import start_scheduler, stop_scheduler, get_scheduled_jobs
 
 setup_logging(debug=settings.DEBUG)
@@ -49,6 +49,7 @@ app.include_router(legal.router, prefix="/legal", tags=["Legal"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(signals.router, prefix="/api/v1/signals", tags=["Signals"])
 app.include_router(oracle.router, prefix="/api/v1/oracle", tags=["Oracle Engine"])
+app.include_router(chart_analysis.router, prefix="/api/v1/chart", tags=["Chart Analysis"])
 app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["Alerts"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(transparency.router, prefix="/api/v1/transparency", tags=["Transparency"])
@@ -65,6 +66,7 @@ async def startup_event():
     from app.db.session import engine
     from app.models.user import User
     from app.models.signal import Signal
+    from app.models.chart import ChartUpload, ChartAnalysisResult
     Base.metadata.create_all(bind=engine)
     logger.info("✅ Database tables ready")
     start_scheduler()
