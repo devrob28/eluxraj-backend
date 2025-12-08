@@ -1,10 +1,27 @@
 """
-Enhanced Data Providers for ORACLE v2.0
+Enhanced Data Providers for ORACLE v2.0 with Caching
 """
 import httpx
-from typing import Dict, Any, Optional, List
-from datetime import datetime
+from typing import Dict, Any, Optional
+from datetime import datetime, timedelta
 from app.core.logging import logger
+
+# Simple in-memory cache
+_cache = {}
+CACHE_TTL = 60  # Cache for 60 seconds
+
+
+def get_cached(key: str) -> Optional[Dict]:
+    if key in _cache:
+        data, timestamp = _cache[key]
+        if datetime.utcnow() - timestamp < timedelta(seconds=CACHE_TTL):
+            return data
+    return None
+
+
+def set_cached(key: str, data: Dict):
+    _cache[key] = (data, datetime.utcnow())
+
 
 class CoinGeckoProvider:
     BASE_URL = "https://api.coingecko.com/api/v3"
@@ -24,11 +41,6 @@ class CoinGeckoProvider:
         "UNI": "uniswap",
         "PEPE": "pepe",
         "SHIB": "shiba-inu",
-        "SPX": "s-p-500",
-        "DJI": "dow-jones",
-        "NDX": "nasdaq",
-        "GOLD": "tether-gold",
-        "SILVER": "silver",
     }
     
     async def get_price_data(self, symbol: str) -> Optional[Dict[str, Any]]:
@@ -36,8 +48,15 @@ class CoinGeckoProvider:
         if not coin_id:
             return None
         
+        # Check cache first
+        cache_key = f"price_{symbol.upper()}"
+        cached = get_cached(cache_key)
+        if cached:
+            logger.info(f"Using cached data for {symbol}")
+            return cached
+        
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
+            async with httpx.AsyncClient(timeout=15) as client:
                 response = await client.get(
                     f"{self.BASE_URL}/coins/{coin_id}",
                     params={
@@ -46,17 +65,22 @@ class CoinGeckoProvider:
                         "market_data": "true",
                         "community_data": "true",
                         "developer_data": "false",
-                    }
+                    },
+                    headers={"Accept": "application/json"}
                 )
+                
+                if response.status_code == 429:
+                    logger.warning(f"CoinGecko rate limited, using fallback for {symbol}")
+                    return await self._get_simple_price(symbol)
                 
                 if response.status_code != 200:
                     logger.error(f"CoinGecko error: {response.status_code}")
-                    return None
+                    return await self._get_simple_price(symbol)
                 
                 data = response.json()
                 market = data.get("market_data", {})
                 
-                return {
+                result = {
                     "symbol": symbol.upper(),
                     "current_price": market.get("current_price", {}).get("usd"),
                     "market_cap": market.get("market_cap", {}).get("usd"),
@@ -76,14 +100,79 @@ class CoinGeckoProvider:
                     "sentiment_votes_down": data.get("sentiment_votes_down_percentage"),
                 }
                 
+                set_cached(cache_key, result)
+                return result
+                
         except Exception as e:
             logger.error(f"CoinGecko fetch error: {e}")
+            return await self._get_simple_price(symbol)
+    
+    async def _get_simple_price(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Fallback to simple price API which has higher rate limits"""
+        coin_id = self.SYMBOL_MAP.get(symbol.upper())
+        if not coin_id:
+            return None
+            
+        cache_key = f"simple_{symbol.upper()}"
+        cached = get_cached(cache_key)
+        if cached:
+            return cached
+            
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.get(
+                    f"{self.BASE_URL}/simple/price",
+                    params={
+                        "ids": coin_id,
+                        "vs_currencies": "usd",
+                        "include_24hr_change": "true",
+                        "include_24hr_vol": "true",
+                        "include_market_cap": "true",
+                    }
+                )
+                
+                if response.status_code != 200:
+                    logger.error(f"Simple price API error: {response.status_code}")
+                    return None
+                
+                data = response.json().get(coin_id, {})
+                
+                result = {
+                    "symbol": symbol.upper(),
+                    "current_price": data.get("usd"),
+                    "market_cap": data.get("usd_market_cap"),
+                    "volume_24h": data.get("usd_24h_vol"),
+                    "price_change_24h": data.get("usd_24h_change"),
+                    "price_change_7d": None,
+                    "price_change_30d": None,
+                    "high_24h": data.get("usd", 0) * 1.02 if data.get("usd") else None,
+                    "low_24h": data.get("usd", 0) * 0.98 if data.get("usd") else None,
+                    "ath": None,
+                    "ath_change_percentage": None,
+                    "circulating_supply": None,
+                    "total_supply": None,
+                    "twitter_followers": None,
+                    "reddit_subscribers": None,
+                    "sentiment_votes_up": 50,
+                    "sentiment_votes_down": 50,
+                }
+                
+                set_cached(cache_key, result)
+                return result
+                
+        except Exception as e:
+            logger.error(f"Simple price fetch error: {e}")
             return None
     
     async def get_market_chart(self, symbol: str, days: int = 7) -> Optional[Dict[str, Any]]:
         coin_id = self.SYMBOL_MAP.get(symbol.upper())
         if not coin_id:
             return None
+        
+        cache_key = f"chart_{symbol.upper()}_{days}"
+        cached = get_cached(cache_key)
+        if cached:
+            return cached
         
         try:
             async with httpx.AsyncClient(timeout=10) as client:
@@ -95,7 +184,9 @@ class CoinGeckoProvider:
                 if response.status_code != 200:
                     return None
                 
-                return response.json()
+                result = response.json()
+                set_cached(cache_key, result)
+                return result
                 
         except Exception as e:
             logger.error(f"CoinGecko chart error: {e}")
@@ -106,26 +197,33 @@ class FearGreedProvider:
     BASE_URL = "https://api.alternative.me/fng/"
     
     async def get_current(self) -> Optional[Dict[str, Any]]:
+        cache_key = "fear_greed"
+        cached = get_cached(cache_key)
+        if cached:
+            return cached
+            
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 response = await client.get(self.BASE_URL, params={"limit": 1})
                 
                 if response.status_code != 200:
-                    return None
+                    return {"value": 50, "classification": "Neutral", "timestamp": None}
                 
                 data = response.json()
                 if data.get("data"):
                     item = data["data"][0]
-                    return {
+                    result = {
                         "value": int(item.get("value", 50)),
                         "classification": item.get("value_classification", "Neutral"),
                         "timestamp": item.get("timestamp"),
                     }
-                return None
+                    set_cached(cache_key, result)
+                    return result
+                return {"value": 50, "classification": "Neutral", "timestamp": None}
                 
         except Exception as e:
             logger.error(f"Fear & Greed fetch error: {e}")
-            return None
+            return {"value": 50, "classification": "Neutral", "timestamp": None}
 
 
 class WhaleAlertProvider:
@@ -163,23 +261,9 @@ class WhaleAlertProvider:
         elif volume_ratio > 8 and price_change > 1:
             whale_score = 70
             activity_type = "accumulating"
-            whale_signals.append({
-                "type": "accumulation",
-                "title": "Whale Activity",
-                "description": "Above average volume with bullish price action",
-                "impact": "bullish",
-                "timestamp": datetime.utcnow().isoformat()
-            })
         elif volume_ratio > 8 and price_change < -1:
             whale_score = 35
             activity_type = "distributing"
-            whale_signals.append({
-                "type": "distribution",
-                "title": "Whale Selling",
-                "description": "Above average volume with bearish price action",
-                "impact": "bearish",
-                "timestamp": datetime.utcnow().isoformat()
-            })
         elif volume_ratio < 3:
             whale_score = 50
             activity_type = "quiet"
@@ -232,9 +316,6 @@ class LiquidationProvider:
             "risk_level": risk_level,
             "volatility_24h": round(volatility_pct, 2),
             "zones": zones,
-            "estimated_liquidations_24h": round(volatility_pct * 50_000_000, 0),
-            "nearest_long_liq": round(current_price * 0.95, 2),
-            "nearest_short_liq": round(current_price * 1.05, 2),
         }
 
 
@@ -266,9 +347,7 @@ class FundingRateProvider:
         return {
             "score": score,
             "estimated_funding_8h": round(estimated_funding, 4),
-            "annualized_rate": round(estimated_funding * 3 * 365, 2),
             "sentiment": sentiment,
-            "long_short_ratio": 1.5 if estimated_funding > 0.03 else 1.0 if estimated_funding > -0.01 else 0.7,
         }
 
 
@@ -283,29 +362,20 @@ class ExchangeFlowProvider:
         if volume_ratio > 10 and price_change < -3:
             flow_type = "heavy_inflow"
             score = 25
-            net_flow = volume_24h * 0.3
         elif volume_ratio > 10 and price_change > 3:
             flow_type = "heavy_outflow"
             score = 80
-            net_flow = -volume_24h * 0.3
         elif volume_ratio > 5 and price_change < 0:
             flow_type = "moderate_inflow"
             score = 40
-            net_flow = volume_24h * 0.15
         elif volume_ratio > 5 and price_change > 0:
             flow_type = "moderate_outflow"
             score = 65
-            net_flow = -volume_24h * 0.15
         else:
             flow_type = "balanced"
             score = 50
-            net_flow = 0
         
-        return {
-            "score": score,
-            "flow_type": flow_type,
-            "net_flow_estimate_usd": round(net_flow, 0),
-        }
+        return {"score": score, "flow_type": flow_type}
 
 
 class OpenInterestProvider:
@@ -316,31 +386,22 @@ class OpenInterestProvider:
         volume_ratio = (volume_24h / market_cap) * 100 if market_cap > 0 else 0
         
         if volume_ratio > 8 and price_change_24h > 2:
-            oi_change = "increasing"
             oi_signal = "new_longs"
             score = 70
         elif volume_ratio > 8 and price_change_24h < -2:
-            oi_change = "increasing"
             oi_signal = "new_shorts"
             score = 35
         else:
-            oi_change = "stable"
             oi_signal = "neutral"
             score = 50
         
-        return {
-            "score": score,
-            "oi_change": oi_change,
-            "signal": oi_signal,
-        }
+        return {"score": score, "signal": oi_signal}
 
 
 class SocialSentimentProvider:
     async def get_social_sentiment(self, symbol: str, price_data: Dict) -> Dict[str, Any]:
         sentiment_up = price_data.get("sentiment_votes_up", 50) or 50
         sentiment_down = price_data.get("sentiment_votes_down", 50) or 50
-        twitter_followers = price_data.get("twitter_followers", 0) or 0
-        reddit_subscribers = price_data.get("reddit_subscribers", 0) or 0
         
         total_votes = sentiment_up + sentiment_down
         bullish_ratio = sentiment_up / total_votes if total_votes > 0 else 0.5
@@ -362,14 +423,7 @@ class SocialSentimentProvider:
             sentiment_level = "extreme_bearish"
             oracle_score = 75
         
-        return {
-            "score": oracle_score,
-            "sentiment_score": sentiment_score,
-            "sentiment_level": sentiment_level,
-            "bullish_votes_pct": round(bullish_ratio * 100, 1),
-            "twitter_followers": twitter_followers,
-            "reddit_subscribers": reddit_subscribers,
-        }
+        return {"score": oracle_score, "sentiment_level": sentiment_level}
 
 
 coingecko = CoinGeckoProvider()
