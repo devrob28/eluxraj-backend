@@ -21,3 +21,4 @@ pillow==10.2.0
 torch==2.1.0
 torchvision==0.16.0
 numpy<2
+# Force rebuild Sun Dec  7 16:33:06 PST 2025
