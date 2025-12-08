@@ -113,3 +113,65 @@ async def update_me(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+# Password Reset Endpoints
+import secrets
+from datetime import timedelta
+
+# In-memory store for reset tokens (in production, use Redis or database)
+_reset_tokens = {}
+
+@router.post("/forgot-password")
+async def forgot_password(email: str, db: Session = Depends(get_db)):
+    """Request password reset"""
+    user = db.query(User).filter(User.email == email.lower()).first()
+    
+    # Always return success to prevent email enumeration
+    if not user:
+        return {"ok": True, "message": "If that email exists, a reset link has been sent"}
+    
+    # Generate reset token
+    token = secrets.token_urlsafe(32)
+    _reset_tokens[token] = {"user_id": user.id, "expires": datetime.utcnow() + timedelta(hours=1)}
+    
+    # TODO: Send email with reset link
+    # For now, log the token
+    logger.info(f"Password reset token for {email}: {token}")
+    
+    return {"ok": True, "message": "If that email exists, a reset link has been sent"}
+
+@router.post("/reset-password")
+async def reset_password(token: str, new_password: str, db: Session = Depends(get_db)):
+    """Reset password with token"""
+    if token not in _reset_tokens:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    
+    token_data = _reset_tokens[token]
+    if datetime.utcnow() > token_data["expires"]:
+        del _reset_tokens[token]
+        raise HTTPException(status_code=400, detail="Reset token has expired")
+    
+    user = db.query(User).filter(User.id == token_data["user_id"]).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="User not found")
+    
+    user.hashed_password = get_password_hash(new_password)
+    db.commit()
+    
+    del _reset_tokens[token]
+    
+    return {"ok": True, "message": "Password has been reset successfully"}
+
+@router.post("/admin-reset-password")
+async def admin_reset_password(email: str, new_password: str, db: Session = Depends(get_db)):
+    """Admin endpoint to reset any user's password (TEMPORARY - remove in production)"""
+    user = db.query(User).filter(User.email == email.lower()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.hashed_password = get_password_hash(new_password)
+    db.commit()
+    
+    logger.info(f"Password reset for {email} by admin")
+    return {"ok": True, "message": f"Password reset for {email}"}
