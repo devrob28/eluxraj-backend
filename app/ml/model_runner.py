@@ -1,20 +1,31 @@
 """
 Pluggable model runner for chart analysis.
-Returns 3 bullish + 3 bearish outcomes with probabilities.
-Replace _simulate_outcomes with real ML model when ready.
+Downloads model from GitHub releases if not present locally.
 """
 import os
 import random
+import urllib.request
 
-MODEL_PATH = os.getenv("CHART_MODEL_PATH", "/app/ml_models/chart_classifier.pt")
+MODEL_PATH = os.getenv("CHART_MODEL_PATH", "/tmp/chart_classifier.pt")
+MODEL_URL = "https://github.com/devrob28/eluxraj-backend/releases/download/v1.0.0-model/chart_classifier.pt"
+
+def download_model():
+    """Download model from GitHub releases if not exists"""
+    if not os.path.exists(MODEL_PATH):
+        print(f"Downloading model from {MODEL_URL}...")
+        try:
+            os.makedirs(os.path.dirname(MODEL_PATH) or '/tmp', exist_ok=True)
+            urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+            print(f"Model downloaded to {MODEL_PATH}")
+        except Exception as e:
+            print(f"Failed to download model: {e}")
+            return False
+    return os.path.exists(MODEL_PATH)
 
 def _simulate_outcomes(asset: str, timeframe: str) -> dict:
     """Generate realistic-looking simulated outcomes for demo/fallback"""
-    
-    # Seed based on asset for consistent results per asset
     random.seed(hash(asset + timeframe) % 10000)
     
-    # Generate probabilities that sum reasonably
     bull_probs = sorted([random.uniform(0.08, 0.45) for _ in range(3)], reverse=True)
     bear_probs = sorted([random.uniform(0.03, 0.20) for _ in range(3)], reverse=True)
     
@@ -36,7 +47,6 @@ def _simulate_outcomes(asset: str, timeframe: str) -> dict:
          "explanation": "Overbought conditions with bearish divergence."}
     ]
     
-    # Determine recommendation based on highest probability
     max_bull = max(bull_probs)
     max_bear = max(bear_probs)
     
@@ -62,12 +72,10 @@ def _simulate_outcomes(asset: str, timeframe: str) -> dict:
 
 
 def run_inference(image_path: str, timeframe: str, asset: str) -> dict:
-    """
-    Main inference function. Replace with real ML model when ready.
-    For now returns simulated outcomes.
-    """
-    # Check if real model exists
-    if os.path.exists(MODEL_PATH):
+    """Main inference function."""
+    
+    # Try to download model if not present
+    if download_model():
         try:
             import torch
             from torchvision import transforms
@@ -89,23 +97,32 @@ def run_inference(image_path: str, timeframe: str, asset: str) -> dict:
                 out = model(x)
                 probs = torch.softmax(out.flatten(), dim=0).cpu().numpy()
                 
-                bulls = [{"name": f"Bull Pattern {i+1}", "probability": float(probs[i]), 
-                         "explanation": "Model-detected bullish signal."} for i in range(3)]
-                bears = [{"name": f"Bear Pattern {i+1}", "probability": float(probs[3+i]),
-                         "explanation": "Model-detected bearish signal."} for i in range(3)]
+                # Map to 6 classes: 3 bull, 3 bear
+                bulls = [
+                    {"name": "Breakout Continuation", "probability": float(probs[0]), "explanation": "Model-detected bullish breakout pattern."},
+                    {"name": "Support Bounce", "probability": float(probs[1]), "explanation": "Model-detected support level bounce."},
+                    {"name": "Trend Reversal Up", "probability": float(probs[2]), "explanation": "Model-detected bullish reversal signal."}
+                ]
+                bears = [
+                    {"name": "Resistance Rejection", "probability": float(probs[3]), "explanation": "Model-detected bearish rejection pattern."},
+                    {"name": "Breakdown Risk", "probability": float(probs[4]), "explanation": "Model-detected breakdown risk."},
+                    {"name": "Trend Reversal Down", "probability": float(probs[5]), "explanation": "Model-detected bearish reversal signal."}
+                ]
                 
-                rec = max(bulls + bears, key=lambda d: d["probability"])
-                side = "buy" if rec in bulls else "sell"
+                # Find best recommendation
+                all_outcomes = bulls + bears
+                best = max(all_outcomes, key=lambda x: x["probability"])
+                side = "buy" if best in bulls else "sell"
                 
                 return {
                     "bullish": bulls,
                     "bearish": bears,
-                    "recommended_trade": {"side": side, "probability": rec["probability"], "rationale": rec["explanation"]},
-                    "model_version": "pytorch-v1.0"
+                    "recommended_trade": {"side": side, "probability": best["probability"], "rationale": best["explanation"]},
+                    "model_version": "deployed-pt-v1.0"
                 }
+                
         except Exception as e:
             print(f"Model inference failed: {e}")
             return _simulate_outcomes(asset, timeframe)
     
-    # No model file - use simulation
     return _simulate_outcomes(asset, timeframe)
