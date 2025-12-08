@@ -81,6 +81,9 @@ def run_inference(image_path: str, timeframe: str, asset: str) -> dict:
             from torchvision import transforms
             from PIL import Image
             
+            # Force CPU mode
+            device = torch.device('cpu')
+            
             t = transforms.Compose([
                 transforms.Resize((224, 224)),
                 transforms.ToTensor(),
@@ -88,10 +91,12 @@ def run_inference(image_path: str, timeframe: str, asset: str) -> dict:
             ])
             
             img = Image.open(image_path).convert("RGB")
-            x = t(img).unsqueeze(0)
+            x = t(img).unsqueeze(0).to(device)
             
-            model = torch.jit.load(MODEL_PATH)
+            # Load model to CPU
+            model = torch.jit.load(MODEL_PATH, map_location=device)
             model.eval()
+            model.to(device)
             
             with torch.no_grad():
                 out = model(x)
@@ -99,14 +104,14 @@ def run_inference(image_path: str, timeframe: str, asset: str) -> dict:
                 
                 # Map to 6 classes: 3 bull, 3 bear
                 bulls = [
-                    {"name": "Breakout Continuation", "probability": float(probs[0]), "explanation": "Model-detected bullish breakout pattern."},
-                    {"name": "Support Bounce", "probability": float(probs[1]), "explanation": "Model-detected support level bounce."},
-                    {"name": "Trend Reversal Up", "probability": float(probs[2]), "explanation": "Model-detected bullish reversal signal."}
+                    {"name": "Breakout Continuation", "probability": round(float(probs[0]), 2), "explanation": "Model-detected bullish breakout pattern."},
+                    {"name": "Support Bounce", "probability": round(float(probs[1]), 2), "explanation": "Model-detected support level bounce."},
+                    {"name": "Trend Reversal Up", "probability": round(float(probs[2]), 2), "explanation": "Model-detected bullish reversal signal."}
                 ]
                 bears = [
-                    {"name": "Resistance Rejection", "probability": float(probs[3]), "explanation": "Model-detected bearish rejection pattern."},
-                    {"name": "Breakdown Risk", "probability": float(probs[4]), "explanation": "Model-detected breakdown risk."},
-                    {"name": "Trend Reversal Down", "probability": float(probs[5]), "explanation": "Model-detected bearish reversal signal."}
+                    {"name": "Resistance Rejection", "probability": round(float(probs[3]), 2), "explanation": "Model-detected bearish rejection pattern."},
+                    {"name": "Breakdown Risk", "probability": round(float(probs[4]), 2), "explanation": "Model-detected breakdown risk."},
+                    {"name": "Trend Reversal Down", "probability": round(float(probs[5]), 2), "explanation": "Model-detected bearish reversal signal."}
                 ]
                 
                 # Find best recommendation
