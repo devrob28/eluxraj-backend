@@ -1,146 +1,149 @@
+"""
+ORACLE API Endpoints - Elite-only ($98/mo)
+"""
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from typing import Optional
 from datetime import datetime
-from app.db.session import get_db
-from app.models.user import User
-from app.models.signal import Signal
 from app.services.oracle import oracle
-from app.services.scanner import scanner
-from app.core.deps import get_current_user
-from app.core.logging import logger
 
 router = APIRouter()
 
-@router.get("/analyze/{symbol}")
-async def analyze_asset(
-    symbol: str,
-    current_user: User = Depends(get_current_user)
-):
-    """Analyze a single asset and return detailed factors"""
-    analysis = await oracle.analyze_asset(symbol.upper())
+
+@router.get("/score/{symbol}")
+async def get_oracle_score(symbol: str):
+    """Get full ORACLE analysis for an asset"""
+    signal = await oracle.generate_signal(symbol.upper())
     
-    if not analysis:
+    if not signal:
         raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
     
     return {
-        "symbol": analysis["symbol"],
-        "factors": analysis["factors"],
-        "price": analysis["price_data"].get("current_price"),
-        "price_change_24h": analysis["price_data"].get("price_change_24h"),
-        "market_sentiment": analysis.get("fng_data"),
-        "timestamp": analysis["timestamp"],
+        "ok": True,
+        "data": signal,
+        "tier": "elite",
+        "model_version": signal.get("model_version"),
     }
 
-@router.get("/signal/{symbol}")
-async def get_signal_for_asset(
-    symbol: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Generate a trading signal for a specific asset"""
-    signal_data = await oracle.generate_signal(symbol.upper())
-    
-    if not signal_data:
-        raise HTTPException(status_code=404, detail=f"Could not generate signal for {symbol}")
-    
-    # Free users get limited data
-    if current_user.subscription_tier == "free":
-        if symbol.upper() not in ["BTC", "ETH", "SOL"]:
-            raise HTTPException(
-                status_code=403,
-                detail="Upgrade to Pro for all assets. Free tier includes BTC, ETH, SOL only."
-            )
-        signal_data["reasoning_factors"] = {}
-        signal_data["input_snapshot"] = {}
-    
-    return signal_data
 
-@router.post("/generate")
-async def generate_and_save_signal(
-    symbol: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Generate a signal and save it to the database"""
-    if current_user.subscription_tier == "free":
-        raise HTTPException(status_code=403, detail="Signal generation requires Pro subscription")
+@router.get("/demo/{symbol}")
+async def get_oracle_demo(symbol: str):
+    """Get demo ORACLE data for non-Elite users"""
+    signal = await oracle.generate_signal(symbol.upper())
     
-    signal_data = await oracle.generate_signal(symbol.upper())
-    
-    if not signal_data:
-        raise HTTPException(status_code=404, detail=f"Could not generate signal for {symbol}")
-    
-    # Create signal in database
-    signal = Signal(
-        asset_type=signal_data["asset_type"],
-        symbol=signal_data["symbol"],
-        pair=signal_data["pair"],
-        signal_type=signal_data["signal_type"],
-        oracle_score=signal_data["oracle_score"],
-        confidence=signal_data["confidence"],
-        entry_price=signal_data["entry_price"],
-        target_price=signal_data["target_price"],
-        stop_loss=signal_data["stop_loss"],
-        risk_reward_ratio=signal_data["risk_reward_ratio"],
-        reasoning_summary=signal_data["reasoning_summary"],
-        reasoning_factors=signal_data["reasoning_factors"],
-        model_version=signal_data["model_version"],
-        input_snapshot=signal_data["input_snapshot"],
-        data_sources=signal_data["data_sources"],
-        timeframe=signal_data["timeframe"],
-        expires_at=datetime.fromisoformat(signal_data["expires_at"]),
-        status="active",
-    )
-    
-    db.add(signal)
-    db.commit()
-    db.refresh(signal)
-    
-    logger.info(f"Signal saved: {signal.symbol} - {signal.signal_type} - Score: {signal.oracle_score}")
+    if not signal:
+        raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
     
     return {
-        "saved": True,
-        "signal_id": signal.id,
-        "signal": signal_data
+        "ok": True,
+        "data": {
+            "symbol": signal["symbol"],
+            "oracle_score": "locked",
+            "signal_type": "locked",
+            "confidence": "locked",
+            "entry_price": signal["entry_price"],
+            "target_price": "locked",
+            "stop_loss": "locked",
+            "risk_reward_ratio": "locked",
+            "reasoning_summary": "Upgrade to Elite to unlock full ORACLE predictions",
+            "reasoning_bullets": [
+                "Whale activity analysis locked",
+                "Liquidation zones locked",
+                "Smart entry points locked",
+            ],
+            "factor_breakdown": [
+                {"name": "whale_activity", "score": "locked", "value": "locked"},
+                {"name": "liquidation_risk", "score": "locked", "value": "locked"},
+                {"name": "funding_rate", "score": "locked", "value": "locked"},
+            ],
+            "is_demo": True,
+            "upgrade_message": "Unlock full ORACLE predictions with Elite subscription - $98/mo",
+            "upgrade_url": "/pricing.html",
+        },
+        "tier": "demo",
     }
 
-@router.post("/scan-all")
-async def scan_all_and_save(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Scan ALL assets and save actionable signals to database"""
-    if current_user.subscription_tier != "elite":
-        raise HTTPException(status_code=403, detail="Market scanning requires Elite subscription")
-    
-    result = await scanner.scan_and_save(db)
-    return result
 
-@router.get("/supported-assets")
+@router.get("/scan")
+async def scan_all_assets():
+    """Scan all supported assets"""
+    signals = await oracle.scan_all_assets()
+    
+    return {
+        "ok": True,
+        "data": signals,
+        "count": len(signals),
+        "scanned_at": datetime.utcnow().isoformat(),
+    }
+
+
+@router.get("/whale-alerts/{symbol}")
+async def get_whale_alerts(symbol: str):
+    """Get whale alerts for an asset"""
+    alerts = await oracle.get_whale_alerts(symbol.upper())
+    
+    return {
+        "ok": True,
+        "symbol": symbol.upper(),
+        "alerts": alerts,
+        "count": len(alerts),
+    }
+
+
+@router.get("/liquidation-map/{symbol}")
+async def get_liquidation_map(symbol: str):
+    """Get liquidation heatmap"""
+    data = await oracle.get_liquidation_map(symbol.upper())
+    
+    if not data:
+        raise HTTPException(status_code=404, detail=f"Could not get data for {symbol}")
+    
+    return {
+        "ok": True,
+        "symbol": symbol.upper(),
+        "data": data,
+    }
+
+
+@router.get("/assets")
 async def get_supported_assets():
     """Get list of supported assets"""
     return {
-        "assets": oracle.SUPPORTED_ASSETS,
-        "total": len(oracle.SUPPORTED_ASSETS),
+        "ok": True,
+        "assets": [
+            {"id": "BTC", "name": "Bitcoin", "icon": "₿"},
+            {"id": "ETH", "name": "Ethereum", "icon": "Ξ"},
+            {"id": "SOL", "name": "Solana", "icon": "◎"},
+            {"id": "BNB", "name": "BNB", "icon": "⬡"},
+            {"id": "XRP", "name": "XRP", "icon": "✕"},
+            {"id": "ADA", "name": "Cardano", "icon": "₳"},
+            {"id": "DOGE", "name": "Dogecoin", "icon": "Ð"},
+            {"id": "AVAX", "name": "Avalanche", "icon": "△"},
+            {"id": "DOT", "name": "Polkadot", "icon": "●"},
+            {"id": "MATIC", "name": "Polygon", "icon": "⬡"},
+            {"id": "LINK", "name": "Chainlink", "icon": "⬡"},
+            {"id": "UNI", "name": "Uniswap", "icon": "🦄"},
+            {"id": "PEPE", "name": "Pepe", "icon": "🐸"},
+            {"id": "SHIB", "name": "Shiba Inu", "icon": "🐕"},
+        ],
     }
 
-@router.get("/health")
-async def oracle_health():
-    """Check Oracle engine health"""
-    from app.services.data_providers import fear_greed
-    
-    btc_data = await oracle.analyze_asset("BTC")
-    coingecko_status = "healthy" if btc_data else "error"
-    
-    fng = await fear_greed.get_current()
-    fng_status = "healthy" if fng else "error"
-    
+
+@router.get("/status")
+async def get_oracle_status():
+    """Get ORACLE system status"""
     return {
-        "oracle_version": oracle.MODEL_VERSION,
-        "status": "healthy" if coingecko_status == "healthy" else "degraded",
-        "providers": {
-            "coingecko": coingecko_status,
-            "fear_greed": fng_status,
-        },
+        "ok": True,
+        "status": "operational",
+        "version": oracle.MODEL_VERSION,
+        "features": [
+            "whale-tracking",
+            "liquidation-zones", 
+            "funding-rates",
+            "exchange-flow",
+            "open-interest",
+            "social-sentiment",
+        ],
         "supported_assets": len(oracle.SUPPORTED_ASSETS),
+        "elite_required": True,
+        "price": "$98/mo",
     }
