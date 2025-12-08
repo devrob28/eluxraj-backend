@@ -1,9 +1,7 @@
 """
 Whale Intelligence API Endpoints - Gotham Intel
 """
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from app.db.database import get_db
+from fastapi import APIRouter, HTTPException
 from app.services.whale_intel import whale_intel_service
 from app.core.logging import logger
 
