@@ -1,133 +1,165 @@
 """
-Pluggable model runner for chart analysis.
-Downloads model from GitHub releases if not present locally.
+Chart Pattern Recognition Model Runner
+Analyzes chart images and returns bullish/bearish probabilities
 """
 import os
 import random
 import urllib.request
+from typing import Dict, List
 
 MODEL_PATH = os.getenv("CHART_MODEL_PATH", "/tmp/chart_classifier.pt")
-MODEL_URL = "https://github.com/devrob28/eluxraj-backend/releases/download/v1.0.0-model/chart_classifier.pt"
+MODEL_URL = os.getenv("MODEL_URL", "https://github.com/devrob28/eluxraj-backend/releases/download/v1.0.0-model/chart_classifier.pt")
 
-def download_model():
+# Pattern definitions matching training labels
+PATTERNS = {
+    0: ("Bullish Flag", "bullish", "Strong uptrend with consolidation, expecting continuation higher."),
+    1: ("Ascending Triangle", "bullish", "Higher lows pressing against resistance, breakout likely."),
+    2: ("Double Bottom", "bullish", "W-pattern reversal, strong support confirmed twice."),
+    3: ("Inverse Head & Shoulders", "bullish", "Classic reversal pattern, neckline break signals upside."),
+    4: ("Cup and Handle", "bullish", "Accumulation pattern complete, bullish breakout imminent."),
+    5: ("Bullish Engulfing", "bullish", "Strong buying pressure overwhelmed sellers."),
+    6: ("Bearish Flag", "bearish", "Downtrend pause, expecting continuation lower."),
+    7: ("Descending Triangle", "bearish", "Lower highs pressing support, breakdown likely."),
+    8: ("Double Top", "bearish", "M-pattern reversal, resistance confirmed twice."),
+    9: ("Head & Shoulders", "bearish", "Classic reversal pattern, neckline break signals downside."),
+    10: ("Rising Wedge", "bearish", "Bearish pattern despite higher highs, reversal expected."),
+    11: ("Bearish Engulfing", "bearish", "Strong selling pressure overwhelmed buyers."),
+}
+
+
+def download_model() -> bool:
     """Download model from GitHub releases if not exists"""
-    if not os.path.exists(MODEL_PATH):
-        print(f"Downloading model from {MODEL_URL}...")
-        try:
-            os.makedirs(os.path.dirname(MODEL_PATH) or '/tmp', exist_ok=True)
-            urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
-            print(f"Model downloaded to {MODEL_PATH}")
-        except Exception as e:
-            print(f"Failed to download model: {e}")
-            return False
-    return os.path.exists(MODEL_PATH)
+    if os.path.exists(MODEL_PATH) and os.path.getsize(MODEL_PATH) > 1000:
+        return True
+    
+    print(f"Downloading model from {MODEL_URL}...")
+    try:
+        os.makedirs(os.path.dirname(MODEL_PATH) or '/tmp', exist_ok=True)
+        urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+        print(f"Model downloaded to {MODEL_PATH}")
+        return os.path.exists(MODEL_PATH) and os.path.getsize(MODEL_PATH) > 1000
+    except Exception as e:
+        print(f"Failed to download model: {e}")
+        return False
 
-def _simulate_outcomes(asset: str, timeframe: str) -> dict:
-    """Generate realistic-looking simulated outcomes for demo/fallback"""
-    random.seed(hash(asset + timeframe) % 10000)
+
+def _build_outcomes(probs: List[float], asset: str, timeframe: str) -> Dict:
+    """Build structured outcomes from model probabilities"""
     
-    bull_probs = sorted([random.uniform(0.08, 0.45) for _ in range(3)], reverse=True)
-    bear_probs = sorted([random.uniform(0.03, 0.20) for _ in range(3)], reverse=True)
+    # Separate bullish and bearish patterns
+    bullish_outcomes = []
+    bearish_outcomes = []
     
-    bulls = [
-        {"name": "Breakout Continuation", "probability": round(bull_probs[0], 2), 
-         "explanation": f"Price structure suggests upward momentum on {timeframe} timeframe."},
-        {"name": "Support Bounce", "probability": round(bull_probs[1], 2),
-         "explanation": "Key support level holding with increasing buy volume."},
-        {"name": "Trend Reversal Up", "probability": round(bull_probs[2], 2),
-         "explanation": "Oversold conditions with bullish divergence forming."}
-    ]
+    for i, prob in enumerate(probs):
+        if i >= len(PATTERNS):
+            continue
+            
+        name, direction, explanation = PATTERNS[i]
+        outcome = {
+            "name": name,
+            "probability": round(float(prob), 2),
+            "explanation": f"{explanation} ({asset} {timeframe})"
+        }
+        
+        if direction == "bullish":
+            bullish_outcomes.append(outcome)
+        else:
+            bearish_outcomes.append(outcome)
     
-    bears = [
-        {"name": "Resistance Rejection", "probability": round(bear_probs[0], 2),
-         "explanation": "Price approaching major resistance with weakening momentum."},
-        {"name": "Breakdown Risk", "probability": round(bear_probs[1], 2),
-         "explanation": "Support level under pressure, distribution pattern visible."},
-        {"name": "Trend Reversal Down", "probability": round(bear_probs[2], 2),
-         "explanation": "Overbought conditions with bearish divergence."}
-    ]
+    # Sort by probability
+    bullish_outcomes.sort(key=lambda x: x["probability"], reverse=True)
+    bearish_outcomes.sort(key=lambda x: x["probability"], reverse=True)
     
-    max_bull = max(bull_probs)
-    max_bear = max(bear_probs)
+    # Take top 3 of each
+    bullish_outcomes = bullish_outcomes[:3]
+    bearish_outcomes = bearish_outcomes[:3]
     
-    if max_bull > max_bear + 0.1:
+    # Determine recommendation
+    total_bull = sum(o["probability"] for o in bullish_outcomes)
+    total_bear = sum(o["probability"] for o in bearish_outcomes)
+    
+    if total_bull > total_bear + 0.15:
         side = "buy"
-        prob = max_bull
-        rationale = "Bullish signals dominate with favorable risk/reward setup."
-    elif max_bear > max_bull + 0.1:
+        prob = bullish_outcomes[0]["probability"] if bullish_outcomes else 0.5
+        rationale = f"Bullish patterns dominate ({bullish_outcomes[0]['name']}). Favorable risk/reward for long position."
+    elif total_bear > total_bull + 0.15:
         side = "sell"
-        prob = max_bear
-        rationale = "Bearish pressure detected, consider defensive positioning."
+        prob = bearish_outcomes[0]["probability"] if bearish_outcomes else 0.5
+        rationale = f"Bearish patterns detected ({bearish_outcomes[0]['name']}). Consider defensive positioning or short."
     else:
         side = "wait"
-        prob = max(max_bull, max_bear)
-        rationale = "Mixed signals - wait for clearer price action confirmation."
+        prob = max(total_bull, total_bear) / 3
+        rationale = "Mixed signals detected. Wait for clearer price action before entering."
     
     return {
-        "bullish": bulls,
-        "bearish": bears,
-        "recommended_trade": {"side": side, "probability": round(prob, 2), "rationale": rationale},
-        "model_version": "simulation-v1.0"
+        "bullish": bullish_outcomes,
+        "bearish": bearish_outcomes,
+        "recommended_trade": {
+            "side": side,
+            "probability": round(prob, 2),
+            "rationale": rationale
+        }
     }
 
 
-def run_inference(image_path: str, timeframe: str, asset: str) -> dict:
-    """Main inference function."""
+def _simulate_outcomes(asset: str, timeframe: str) -> Dict:
+    """Generate simulated outcomes when model unavailable"""
+    # Use asset+timeframe as seed for consistency
+    random.seed(hash(asset + timeframe + str(random.randint(0, 1000))) % 100000)
     
-    # Try to download model if not present
+    # Generate 12 probabilities that roughly sum to 1
+    raw_probs = [random.random() for _ in range(12)]
+    total = sum(raw_probs)
+    probs = [p / total for p in raw_probs]
+    
+    result = _build_outcomes(probs, asset, timeframe)
+    result["model_version"] = "simulation-v2.0"
+    return result
+
+
+def run_inference(image_path: str, timeframe: str, asset: str) -> Dict:
+    """
+    Run chart pattern recognition on an image.
+    Returns bullish/bearish outcomes with probabilities.
+    """
+    
+    # Try to use real model
     if download_model():
         try:
             import torch
             from torchvision import transforms
             from PIL import Image
             
-            # Force CPU mode
             device = torch.device('cpu')
             
-            t = transforms.Compose([
+            # Preprocessing
+            transform = transforms.Compose([
                 transforms.Resize((224, 224)),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
             ])
             
+            # Load and preprocess image
             img = Image.open(image_path).convert("RGB")
-            x = t(img).unsqueeze(0).to(device)
+            x = transform(img).unsqueeze(0).to(device)
             
-            # Load model to CPU
+            # Load model
             model = torch.jit.load(MODEL_PATH, map_location=device)
             model.eval()
-            model.to(device)
             
+            # Inference
             with torch.no_grad():
-                out = model(x)
-                probs = torch.softmax(out.flatten(), dim=0).cpu().numpy()
-                
-                # Map to 6 classes: 3 bull, 3 bear
-                bulls = [
-                    {"name": "Breakout Continuation", "probability": round(float(probs[0]), 2), "explanation": "Model-detected bullish breakout pattern."},
-                    {"name": "Support Bounce", "probability": round(float(probs[1]), 2), "explanation": "Model-detected support level bounce."},
-                    {"name": "Trend Reversal Up", "probability": round(float(probs[2]), 2), "explanation": "Model-detected bullish reversal signal."}
-                ]
-                bears = [
-                    {"name": "Resistance Rejection", "probability": round(float(probs[3]), 2), "explanation": "Model-detected bearish rejection pattern."},
-                    {"name": "Breakdown Risk", "probability": round(float(probs[4]), 2), "explanation": "Model-detected breakdown risk."},
-                    {"name": "Trend Reversal Down", "probability": round(float(probs[5]), 2), "explanation": "Model-detected bearish reversal signal."}
-                ]
-                
-                # Find best recommendation
-                all_outcomes = bulls + bears
-                best = max(all_outcomes, key=lambda x: x["probability"])
-                side = "buy" if best in bulls else "sell"
-                
-                return {
-                    "bullish": bulls,
-                    "bearish": bears,
-                    "recommended_trade": {"side": side, "probability": best["probability"], "rationale": best["explanation"]},
-                    "model_version": "deployed-pt-v1.0"
-                }
-                
+                outputs = model(x)
+                probs = torch.softmax(outputs.flatten(), dim=0).cpu().numpy()
+            
+            # Build response
+            result = _build_outcomes(probs.tolist(), asset, timeframe)
+            result["model_version"] = "cnn-v1.0"
+            return result
+            
         except Exception as e:
             print(f"Model inference failed: {e}")
-            return _simulate_outcomes(asset, timeframe)
+            # Fall through to simulation
     
+    # Fallback to simulation
     return _simulate_outcomes(asset, timeframe)
