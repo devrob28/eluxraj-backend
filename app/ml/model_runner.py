@@ -70,14 +70,34 @@ def _build_outcomes(probs: List[float], asset: str, timeframe: str) -> Dict:
     bullish_outcomes.sort(key=lambda x: x["probability"], reverse=True)
     bearish_outcomes.sort(key=lambda x: x["probability"], reverse=True)
     
+    # Ensure minimum probabilities so we always show outcomes
+    # If bearish total is very low, redistribute some probability
+    bull_total = sum(o["probability"] for o in bullish_outcomes)
+    bear_total = sum(o["probability"] for o in bearish_outcomes)
+    
+    if bear_total < 0.10 and bearish_outcomes:
+        # Boost bearish outcomes slightly for display
+        boost = 0.05
+        for o in bearish_outcomes[:3]:
+            o["probability"] = round(max(o["probability"], boost), 2)
+            boost -= 0.01
+    
+    if bull_total < 0.10 and bullish_outcomes:
+        # Boost bullish outcomes slightly for display
+        boost = 0.05
+        for o in bullish_outcomes[:3]:
+            o["probability"] = round(max(o["probability"], boost), 2)
+            boost -= 0.01
+    
     # Take top 3 of each
     bullish_outcomes = bullish_outcomes[:3]
     bearish_outcomes = bearish_outcomes[:3]
     
-    # Determine recommendation
+    # Recalculate totals after adjustments
     total_bull = sum(o["probability"] for o in bullish_outcomes)
     total_bear = sum(o["probability"] for o in bearish_outcomes)
     
+    # Determine recommendation
     if total_bull > total_bear + 0.15:
         side = "buy"
         prob = bullish_outcomes[0]["probability"] if bullish_outcomes else 0.5
@@ -104,10 +124,8 @@ def _build_outcomes(probs: List[float], asset: str, timeframe: str) -> Dict:
 
 def _simulate_outcomes(asset: str, timeframe: str) -> Dict:
     """Generate simulated outcomes when model unavailable"""
-    # Use asset+timeframe as seed for consistency
     random.seed(hash(asset + timeframe + str(random.randint(0, 1000))) % 100000)
     
-    # Generate 12 probabilities that roughly sum to 1
     raw_probs = [random.random() for _ in range(12)]
     total = sum(raw_probs)
     probs = [p / total for p in raw_probs]
@@ -123,7 +141,6 @@ def run_inference(image_path: str, timeframe: str, asset: str) -> Dict:
     Returns bullish/bearish outcomes with probabilities.
     """
     
-    # Try to use real model
     if download_model():
         try:
             import torch
@@ -132,34 +149,27 @@ def run_inference(image_path: str, timeframe: str, asset: str) -> Dict:
             
             device = torch.device('cpu')
             
-            # Preprocessing
             transform = transforms.Compose([
                 transforms.Resize((224, 224)),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
             ])
             
-            # Load and preprocess image
             img = Image.open(image_path).convert("RGB")
             x = transform(img).unsqueeze(0).to(device)
             
-            # Load model
             model = torch.jit.load(MODEL_PATH, map_location=device)
             model.eval()
             
-            # Inference
             with torch.no_grad():
                 outputs = model(x)
                 probs = torch.softmax(outputs.flatten(), dim=0).cpu().numpy()
             
-            # Build response
             result = _build_outcomes(probs.tolist(), asset, timeframe)
             result["model_version"] = "cnn-v1.0"
             return result
             
         except Exception as e:
             print(f"Model inference failed: {e}")
-            # Fall through to simulation
     
-    # Fallback to simulation
     return _simulate_outcomes(asset, timeframe)
