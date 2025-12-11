@@ -62,3 +62,27 @@ def require_subscription(min_tier: str):
         return current_user
     
     return check_subscription
+
+
+async def require_elite(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Require Elite subscription tier"""
+    if current_user.subscription_tier not in ['elite', 'pro']:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Elite subscription required"
+        )
+    return current_user
+
+
+async def require_pro(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Require Pro or Elite subscription tier"""
+    if current_user.subscription_tier not in ['elite', 'pro']:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Pro subscription required"
+        )
+    return current_user
