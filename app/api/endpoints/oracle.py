@@ -205,3 +205,104 @@ async def get_oracle_status():
             "RSI Divergence"
         ] if ORACLE_VERSION == "v3.0" else ["Basic ORACLE v2"]
     }
+
+
+@router.get("/stock/{symbol}")
+async def get_stock_oracle(
+    symbol: str,
+    user = Depends(require_elite)
+):
+    """
+    Get ORACLE signal for a stock
+    Uses Yahoo Finance for stock data
+    """
+    import httpx
+    from datetime import datetime, timedelta
+    
+    try:
+        # Fetch stock data from Yahoo Finance
+        async with httpx.AsyncClient() as client:
+            # Get quote data
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=30d"
+            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            data = resp.json()
+            
+            if "chart" not in data or not data["chart"]["result"]:
+                raise HTTPException(status_code=404, detail=f"Stock {symbol} not found")
+            
+            result = data["chart"]["result"][0]
+            meta = result["meta"]
+            quote = result["indicators"]["quote"][0]
+            
+            current_price = meta.get("regularMarketPrice", 0)
+            prev_close = meta.get("previousClose", current_price)
+            change_pct = ((current_price - prev_close) / prev_close * 100) if prev_close else 0
+            
+            # Calculate simple technical score
+            closes = quote.get("close", [])
+            closes = [c for c in closes if c is not None]
+            
+            if len(closes) >= 5:
+                sma5 = sum(closes[-5:]) / 5
+                sma20 = sum(closes[-20:]) / 20 if len(closes) >= 20 else sma5
+                
+                # Simple scoring
+                trend_score = 60 if current_price > sma5 else 40
+                momentum_score = 60 if sma5 > sma20 else 40
+                volatility = max(closes[-5:]) - min(closes[-5:])
+                vol_score = 50 if volatility / current_price < 0.05 else 40
+                
+                oracle_score = int((trend_score + momentum_score + vol_score) / 3)
+            else:
+                oracle_score = 50
+            
+            # Determine signal
+            if oracle_score >= 60:
+                signal_type = "buy"
+                confidence = "high" if oracle_score >= 70 else "medium"
+            elif oracle_score <= 40:
+                signal_type = "sell"
+                confidence = "high" if oracle_score <= 30 else "medium"
+            else:
+                signal_type = "hold"
+                confidence = "low"
+            
+            target_pct = 5
+            stop_pct = 3
+            
+            return {
+                "ok": True,
+                "data": {
+                    "asset_type": "stock",
+                    "symbol": symbol.upper(),
+                    "signal_type": signal_type,
+                    "oracle_score": oracle_score,
+                    "confidence": confidence,
+                    "price": current_price,
+                    "entry_price": current_price,
+                    "target_price": current_price * (1 + target_pct / 100),
+                    "stop_loss": current_price * (1 - stop_pct / 100),
+                    "target_pct": target_pct,
+                    "stop_pct": stop_pct,
+                    "risk_reward_ratio": round(target_pct / stop_pct, 1),
+                    "price_change_24h": round(change_pct, 2),
+                    "factor_breakdown": [
+                        {"name": "trend", "score": trend_score if 'trend_score' in dir() else 50, "value": "bullish" if oracle_score > 50 else "bearish"},
+                        {"name": "momentum", "score": momentum_score if 'momentum_score' in dir() else 50, "value": "positive" if oracle_score > 50 else "negative"},
+                        {"name": "volatility", "score": vol_score if 'vol_score' in dir() else 50, "value": "moderate"},
+                    ],
+                    "reasoning_summary": f"{signal_type.upper()} - {symbol} ORACLE Score: {oracle_score}/100",
+                    "reasoning_bullets": [
+                        f"Current price: ${current_price:.2f}",
+                        f"24h change: {change_pct:+.2f}%"
+                    ],
+                    "model_version": "oracle-stock-v1.0"
+                },
+                "tier": user.subscription_tier
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Stock oracle error for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to analyze {symbol}")
