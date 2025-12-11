@@ -3,7 +3,7 @@ ORACLE API Endpoints - v3.0 Institutional Grade
 """
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional
-from app.api.deps import get_current_user, require_elite
+from app.core.deps import get_current_user, require_elite
 from app.core.logging import logger
 
 router = APIRouter()
