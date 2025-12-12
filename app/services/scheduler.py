@@ -1,117 +1,130 @@
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.interval import IntervalTrigger
-from apscheduler.triggers.cron import CronTrigger
-from datetime import datetime
-from app.db.session import SessionLocal
-from app.services.scanner import scanner
+"""
+ELUXRAJ Scheduler Service
+Runs periodic tasks: portfolio scans, alert checks, data updates
+"""
+import asyncio
+from datetime import datetime, timezone
 from app.core.logging import logger
 
-# Create scheduler
-scheduler = AsyncIOScheduler()
 
-async def scheduled_market_scan():
-    """Run market scan on schedule"""
-    logger.info("⏰ Starting scheduled market scan...")
+class Scheduler:
+    """Simple task scheduler for periodic jobs"""
+    
+    def __init__(self):
+        self.tasks = {}
+        self.running = False
+    
+    def add_task(self, name: str, interval_seconds: int, func):
+        """Add a periodic task"""
+        self.tasks[name] = {
+            "interval": interval_seconds,
+            "func": func,
+            "last_run": None
+        }
+    
+    async def run_task(self, name: str):
+        """Run a single task"""
+        task = self.tasks.get(name)
+        if not task:
+            return
+        
+        try:
+            logger.info(f"Running scheduled task: {name}")
+            if asyncio.iscoroutinefunction(task["func"]):
+                await task["func"]()
+            else:
+                task["func"]()
+            task["last_run"] = datetime.now(timezone.utc)
+            logger.info(f"Task {name} completed")
+        except Exception as e:
+            logger.error(f"Task {name} failed: {e}")
+    
+    async def start(self):
+        """Start the scheduler loop"""
+        self.running = True
+        logger.info("Scheduler started")
+        
+        while self.running:
+            now = datetime.now(timezone.utc)
+            
+            for name, task in self.tasks.items():
+                # Check if task should run
+                if task["last_run"] is None:
+                    should_run = True
+                else:
+                    elapsed = (now - task["last_run"]).total_seconds()
+                    should_run = elapsed >= task["interval"]
+                
+                if should_run:
+                    asyncio.create_task(self.run_task(name))
+            
+            # Sleep before checking again
+            await asyncio.sleep(60)  # Check every minute
+    
+    def stop(self):
+        """Stop the scheduler"""
+        self.running = False
+        logger.info("Scheduler stopped")
+
+
+# Global scheduler instance
+scheduler = Scheduler()
+
+
+async def hourly_portfolio_scan():
+    """Scan all users' watchlist assets hourly"""
+    from app.db.session import SessionLocal
+    from app.services.oracle import oracle
+    from app.api.endpoints.alerts import check_and_trigger_alerts
     
     db = SessionLocal()
     try:
-        result = await scanner.scan_and_save(db)
-        logger.info(f"✅ Scheduled scan complete: {result['saved']} signals saved")
+        # Get unique assets from all alert rules
+        from app.api.endpoints.alerts import AlertRule
+        rules = db.query(AlertRule).filter(AlertRule.is_active == True).all()
+        assets = list(set(r.asset for r in rules))
         
-        # Log summary
-        if result['saved_signals']:
-            for sig in result['saved_signals']:
-                logger.info(f"   📊 {sig['symbol']}: {sig['signal_type'].upper()} (Score: {sig['score']})")
+        logger.info(f"Hourly scan: {len(assets)} assets")
         
-        return result
-    except Exception as e:
-        logger.error(f"❌ Scheduled scan failed: {e}")
+        for asset in assets:
+            try:
+                signal = await oracle.generate_signal(asset)
+                if signal:
+                    score = signal.get("oracle_score", 50)
+                    await check_and_trigger_alerts(asset, "oracle_score", score, db)
+            except Exception as e:
+                logger.error(f"Scan error for {asset}: {e}")
+        
     finally:
         db.close()
 
-async def cleanup_expired_signals():
-    """Mark expired signals"""
-    logger.info("🧹 Cleaning up expired signals...")
-    
-    from app.models.signal import Signal
+
+async def whale_alert_check():
+    """Check for significant whale movements"""
+    from app.db.session import SessionLocal
+    from app.api.endpoints.alerts import check_and_trigger_alerts
     
     db = SessionLocal()
     try:
-        expired = db.query(Signal).filter(
-            Signal.status == "active",
-            Signal.expires_at < datetime.utcnow()
-        ).all()
-        
-        for signal in expired:
-            signal.status = "expired"
-            logger.info(f"   Expired: {signal.symbol} (ID: {signal.id})")
-        
-        db.commit()
-        logger.info(f"✅ Marked {len(expired)} signals as expired")
-    except Exception as e:
-        logger.error(f"❌ Cleanup failed: {e}")
+        # TODO: Integrate with whale tracking API
+        # For now, this is a placeholder
+        logger.info("Whale alert check running")
     finally:
         db.close()
 
-def start_scheduler():
-    """Start the background scheduler"""
-    
-    # Scan markets every hour
-    scheduler.add_job(
-        scheduled_market_scan,
-        trigger=IntervalTrigger(hours=1),
-        id="market_scan_hourly",
-        name="Hourly Market Scan",
-        replace_existing=True
-    )
-    
-    # Also scan at specific times (market open/close)
-    # 9:30 AM ET (14:30 UTC) - US market open
-    scheduler.add_job(
-        scheduled_market_scan,
-        trigger=CronTrigger(hour=14, minute=30),
-        id="market_scan_us_open",
-        name="US Market Open Scan",
-        replace_existing=True
-    )
-    
-    # 4:00 PM ET (21:00 UTC) - US market close
-    scheduler.add_job(
-        scheduled_market_scan,
-        trigger=CronTrigger(hour=21, minute=0),
-        id="market_scan_us_close",
-        name="US Market Close Scan",
-        replace_existing=True
-    )
-    
-    # Cleanup expired signals every 6 hours
-    scheduler.add_job(
-        cleanup_expired_signals,
-        trigger=IntervalTrigger(hours=6),
-        id="cleanup_expired",
-        name="Cleanup Expired Signals",
-        replace_existing=True
-    )
-    
-    scheduler.start()
-    logger.info("📅 Scheduler started!")
-    logger.info("   - Market scan: Every hour")
-    logger.info("   - US market open scan: 9:30 AM ET")
-    logger.info("   - US market close scan: 4:00 PM ET")
-    logger.info("   - Cleanup: Every 6 hours")
 
-def stop_scheduler():
-    """Stop the scheduler"""
-    scheduler.shutdown()
-    logger.info("📅 Scheduler stopped")
+def setup_scheduler():
+    """Configure scheduled tasks"""
+    # Hourly portfolio scan
+    scheduler.add_task("hourly_scan", 3600, hourly_portfolio_scan)
+    
+    # Whale alerts every 5 minutes
+    scheduler.add_task("whale_check", 300, whale_alert_check)
+    
+    logger.info("Scheduler tasks configured")
 
-def get_scheduled_jobs():
-    """Get list of scheduled jobs"""
-    jobs = []
-    for job in scheduler.get_jobs():
-        jobs.append({
-            "id": job.id,
-            "name": job.name,
-            "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
-        })
-    return jobs
+
+async def start_scheduler():
+    """Start the scheduler (call from main.py)"""
+    setup_scheduler()
+    await scheduler.start()
