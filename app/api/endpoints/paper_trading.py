@@ -130,17 +130,23 @@ async def get_current_price(asset: str, asset_type: str) -> float:
     """Get current price for an asset"""
     import httpx
     
+    # Map common symbols to CoinGecko IDs
+    symbol_map = {
+        "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
+        "BNB": "binancecoin", "XRP": "ripple", "DOGE": "dogecoin",
+        "ADA": "cardano", "AVAX": "avalanche-2", "LINK": "chainlink",
+        "MATIC": "matic-network", "DOT": "polkadot", "UNI": "uniswap"
+    }
+    
     try:
         if asset_type == "crypto":
+            coin_id = symbol_map.get(asset.upper(), asset.lower())
             async with httpx.AsyncClient() as client:
                 resp = await client.get(
-                    f"https://api.coingecko.com/api/v3/simple/price?ids={asset.lower()}&vs_currencies=usd",
+                    f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd",
                     timeout=10.0
                 )
                 data = resp.json()
-                # Map common symbols
-                symbol_map = {"BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana"}
-                coin_id = symbol_map.get(asset.upper(), asset.lower())
                 return data.get(coin_id, {}).get("usd", 0)
         else:
             async with httpx.AsyncClient() as client:
