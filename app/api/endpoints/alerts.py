@@ -8,7 +8,8 @@ from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, JSON, 
 from datetime import datetime, timezone
 from typing import Optional, List
 from pydantic import BaseModel
-from app.db.session import get_db, Base
+from app.db.session import get_db
+from app.db.base import Base
 from app.core.deps import get_current_user
 from app.core.logging import logger
 import httpx
