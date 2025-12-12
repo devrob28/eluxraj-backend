@@ -128,3 +128,20 @@ async def start_scheduler():
     """Start the scheduler (call from main.py)"""
     setup_scheduler()
     await scheduler.start()
+
+
+def stop_scheduler():
+    """Stop the scheduler"""
+    scheduler.stop()
+
+
+def get_scheduled_jobs():
+    """Get list of scheduled jobs"""
+    return [
+        {
+            "name": name,
+            "interval": task["interval"],
+            "last_run": task["last_run"].isoformat() if task["last_run"] else None
+        }
+        for name, task in scheduler.tasks.items()
+    ]
