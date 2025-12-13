@@ -57,3 +57,13 @@ async def whale_intel_status():
         "version": "1.0.0",
         "features": ["live_transfers", "exchange_flows", "insights", "sentiment"]
     }
+
+
+@router.get("/solana")
+async def get_solana_whales():
+    """Get Solana whale activity from MobyScreener"""
+    try:
+        return await whale_intel_service.get_solana_whales()
+    except Exception as e:
+        logger.error(f"Error getting Solana whales: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
