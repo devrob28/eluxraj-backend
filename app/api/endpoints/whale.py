@@ -5,7 +5,7 @@ from fastapi import APIRouter, Query
 from typing import Optional
 from app.services.alchemy_whale_service import alchemy_whale_service
 
-router = APIRouter(prefix="/whale", tags=["Whale Intel"])
+router = APIRouter(prefix="", tags=["Whale Intel"])
 
 
 @router.get("/transfers")
