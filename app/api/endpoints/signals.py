@@ -35,7 +35,7 @@ async def get_signals(
     query = query.filter(Signal.oracle_score >= min_score)
     
     # Free tier restrictions
-    if current_user.subscription_tier == "free":
+    if current_user.subscription_tier == "lite":
         delay_cutoff = datetime.utcnow() - timedelta(hours=2)
         query = query.filter(Signal.created_at <= delay_cutoff)
         query = query.filter(Signal.symbol.in_(["BTC", "ETH", "SOL"]))

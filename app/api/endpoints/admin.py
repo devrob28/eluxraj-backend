@@ -72,7 +72,7 @@ async def get_dashboard_stats(
             "active": active_users,
             "new_this_week": new_users_week,
             "by_tier": {
-                "free": tier_counts.get("free", 0),
+                "lite": tier_counts.get("lite", 0),
                 "pro": tier_counts.get("pro", 0),
                 "elite": tier_counts.get("elite", 0),
             }
@@ -180,7 +180,7 @@ async def update_user_tier(
 ):
     """Upgrade/downgrade user subscription tier"""
     
-    if tier not in ["free", "pro", "elite"]:
+    if tier not in ["lite", "pro", "elite"]:
         raise HTTPException(status_code=400, detail="Invalid tier")
     
     user = db.query(User).filter(User.id == user_id).first()

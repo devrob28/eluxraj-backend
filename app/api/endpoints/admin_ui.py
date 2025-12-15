@@ -270,7 +270,7 @@ async def admin_dashboard():
                         <td>${u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}</td>
                         <td>
                             <select onchange="updateTier(${u.id}, this.value)" style="background:#1a1a2e;color:#fff;border:1px solid #333;padding:4px 8px;border-radius:4px;">
-                                <option value="free" ${u.subscription_tier==='free'?'selected':''}>Free</option>
+                                <option value="lite" ${u.subscription_tier==='lite'?'selected':''}>Free</option>
                                 <option value="pro" ${u.subscription_tier==='pro'?'selected':''}>Pro</option>
                                 <option value="elite" ${u.subscription_tier==='elite'?'selected':''}>Elite</option>
                             </select>

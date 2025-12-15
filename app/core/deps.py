@@ -43,7 +43,7 @@ async def get_current_active_user(
 def require_subscription(min_tier: str):
     """Dependency to require minimum subscription tier"""
     tier_levels = {
-        "free": 0,
+        "lite": 0,
         "pro": 1,
         "elite": 2
     }

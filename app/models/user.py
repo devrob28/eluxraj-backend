@@ -11,7 +11,7 @@ class User(Base):
     full_name = Column(String(255))
     
     # Subscription
-    subscription_tier = Column(String(20), default="free")
+    subscription_tier = Column(String(20), default="lite")
     stripe_customer_id = Column(String(255), nullable=True)
     stripe_subscription_id = Column(String(255), nullable=True)
     subscription_expires_at = Column(DateTime(timezone=True), nullable=True)
