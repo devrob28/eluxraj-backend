@@ -1,6 +1,7 @@
 """
 Watchlist API - Track favorite assets
-"""from fastapi import APIRouter, Depends, HTTPException
+"""
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from datetime import datetime, timezone
