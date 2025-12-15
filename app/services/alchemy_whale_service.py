@@ -15,18 +15,18 @@ ALCHEMY_API_KEY = os.getenv("ALCHEMY_API_KEY", "")
 ALCHEMY_BASE_URL = f"https://eth-mainnet.g.alchemy.com/v2/{ALCHEMY_API_KEY}"
 
 WHALE_WALLETS = {
-    "0x28C6c06298d514Db089934071355E5743bf21d60": {"name": "Binance", "type": "exchange"},
-    "0x21a31Ee1afC51d94C2eFcCAa2092aD1028285549": {"name": "Binance", "type": "exchange"},
-    "0x71660c4005BA85c37ccec55d0C4493E66Fe775d3": {"name": "Coinbase", "type": "exchange"},
-    "0x503828976D22510aad0201ac7EC88293211D23Da": {"name": "Coinbase", "type": "exchange"},
-    "0x2910543Af39abA0Cd09dBb2D50200b3E800A63D2": {"name": "Kraken", "type": "exchange"},
-    "0x6cC5F688a315f3dC28A7781717a9A798a59fDA7b": {"name": "OKX", "type": "exchange"},
-    "0x236F9F97e0E62388479bf9E5BA4889e46B0273C3": {"name": "Bitfinex", "type": "exchange"},
-    "0x9B64203878F24eB0CDF55c8c6fA7D08Ba0cF77E5": {"name": "Jump Trading", "type": "whale"},
-    "0x1B3cB81E51011b549d78bf720b0d924ac763A7C2": {"name": "Wintermute", "type": "whale"},
-    "0xE592427A0AEce92De3Edee1F18E0157C05861564": {"name": "Uniswap V3", "type": "dex"},
-    "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D": {"name": "Uniswap V2", "type": "dex"},
-    "0x5754284f345afc66a98fbB0a0Afe71e0F007B949": {"name": "Tether Treasury", "type": "treasury"},
+    "0x28c6c06298d514db089934071355e5743bf21d60": {"name": "Binance", "type": "exchange"},
+    "0x21a31ee1afc51d94c2efccaa2092ad1028285549": {"name": "Binance", "type": "exchange"},
+    "0x71660c4005ba85c37ccec55d0c4493e66fe775d3": {"name": "Coinbase", "type": "exchange"},
+    "0x503828976d22510aad0201ac7ec88293211d23da": {"name": "Coinbase", "type": "exchange"},
+    "0x2910543af39aba0cd09dbb2d50200b3e800a63d2": {"name": "Kraken", "type": "exchange"},
+    "0x6cc5f688a315f3dc28a7781717a9a798a59fda7b": {"name": "OKX", "type": "exchange"},
+    "0x236f9f97e0e62388479bf9e5ba4889e46b0273c3": {"name": "Bitfinex", "type": "exchange"},
+    "0x9b64203878f24eb0cdf55c8c6fa7d08ba0cf77e5": {"name": "Jump Trading", "type": "whale"},
+    "0x1b3cb81e51011b549d78bf720b0d924ac763a7c2": {"name": "Wintermute", "type": "whale"},
+    "0xe592427a0aece92de3edee1f18e0157c05861564": {"name": "Uniswap V3", "type": "dex"},
+    "0x7a250d5630b4cf539739df2c5dacb4c659f2488d": {"name": "Uniswap V2", "type": "dex"},
+    "0x5754284f345afc66a98fbb0a0afe71e0f007b949": {"name": "Tether Treasury", "type": "treasury"},
 }
 
 
@@ -66,9 +66,9 @@ class AlchemyWhaleService:
     async def get_whale_transfers(self, limit: int = 20) -> List[Dict]:
         all_transfers = []
         priority_wallets = [
-            "0x28C6c06298d514Db089934071355E5743bf21d60",
-            "0x71660c4005BA85c37ccec55d0C4493E66Fe775d3",
-            "0x2910543Af39abA0Cd09dBb2D50200b3E800A63D2",
+            "0x28c6c06298d514db089934071355e5743bf21d60",
+            "0x71660c4005ba85c37ccec55d0c4493e66fe775d3",
+            "0x2910543af39aba0cd09dbb2d50200b3e800a63d2",
         ]
         
         for wallet in priority_wallets:
@@ -92,8 +92,8 @@ class AlchemyWhaleService:
     def _format_transfer(self, transfer: Dict) -> Dict:
         from_addr = transfer.get("from", "")
         to_addr = transfer.get("to", "")
-        from_info = self.whale_wallets.get(from_addr, {"name": self._short_addr(from_addr), "type": "wallet"})
-        to_info = self.whale_wallets.get(to_addr, {"name": self._short_addr(to_addr), "type": "wallet"})
+        from_info = self.whale_wallets.get(from_addr.lower(), {"name": self._short_addr(from_addr), "type": "wallet"})
+        to_info = self.whale_wallets.get(to_addr.lower(), {"name": self._short_addr(to_addr), "type": "wallet"})
         
         direction = transfer.get("direction", "unknown")
         impact = "bullish" if direction == "outflow" else "bearish" if direction == "inflow" else "neutral"
