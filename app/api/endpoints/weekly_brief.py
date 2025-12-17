@@ -26,7 +26,7 @@ async def get_brief_archive(limit: int=10, user=Depends(get_current_user), db: S
 @router.post("/generate")
 async def generate_brief(user=Depends(get_current_user), db: Session=Depends(get_db)):
     """Manually generate a new brief (admin only)"""
-    if user.subscription_tier != "admin" and not user.is_admin:
+    if user.subscription_tier not in ["admin", "elite"] and not getattr(user, "is_admin", False):
         raise HTTPException(status_code=403, detail="Admin only")
     
     brief = await weekly_brief_service.generate_weekly_brief(db)
