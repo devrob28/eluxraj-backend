@@ -13,7 +13,7 @@ from app.core.exceptions import (
     sqlalchemy_exception_handler,
     generic_exception_handler
 )
-from app.api.endpoints import auth, signals, oracle, alerts, admin, admin_ui, legal, transparency, content, public, marketing, chart_analysis, whale, paper_trading, watchlist, daily_brief
+from app.api.endpoints import auth, signals, oracle, alerts, admin, admin_ui, legal, transparency, content, public, marketing, chart_analysis, whale, paper_trading, watchlist, daily_brief, weekly_brief, weekly_brief
 from app.services.scheduler import start_scheduler, stop_scheduler, get_scheduled_jobs
 
 setup_logging(debug=settings.DEBUG)
@@ -59,6 +59,8 @@ app.include_router(content.router, prefix="/api/v1/content", tags=["Content"])
 app.include_router(marketing.router, prefix="/api/v1/marketing", tags=["Marketing"])
 app.include_router(watchlist.router, prefix="/api/v1/watchlist", tags=["Watchlist"])
 app.include_router(daily_brief.router, prefix="/api/v1/daily-brief", tags=["Daily Brief"])
+app.include_router(weekly_brief.router, prefix="/api/v1/weekly-brief", tags=["Weekly Brief"])
+app.include_router(weekly_brief.router, prefix="/api/v1/weekly-brief", tags=["Weekly Brief"])
 
 # Admin UI
 app.include_router(admin_ui.router, prefix="/admin", tags=["Admin UI"])
