@@ -17,3 +17,16 @@ def run_migrations(engine):
             logger.info("✅ Migration: phone column ready")
         except Exception as e:
             logger.warning(f"Migration note: {e}")
+
+        # Add stock columns to weekly_briefs if not exists
+        try:
+            conn.execute(text("""
+                ALTER TABLE weekly_briefs ADD COLUMN IF NOT EXISTS stock_top_performers JSON
+            """))
+            conn.execute(text("""
+                ALTER TABLE weekly_briefs ADD COLUMN IF NOT EXISTS stock_worst_performers JSON
+            """))
+            conn.commit()
+            logger.info("✅ Migration: stock columns ready")
+        except Exception as e:
+            logger.warning(f"Migration note: {e}")

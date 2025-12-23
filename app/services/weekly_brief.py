@@ -1,188 +1,319 @@
 """
 Weekly AI Brief Service
-Auto-generates weekly market analysis for retention
+Generates comprehensive weekly market analysis for crypto AND stocks
 """
+import httpx
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional
-from sqlalchemy import Column, Integer, String, Text, DateTime, JSON
 from sqlalchemy.orm import Session
+from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, desc
 from app.db.base import Base
-from app.services.market_bias import market_bias_service
 from app.core.logging import logger
 
 
 class WeeklyBrief(Base):
-    """Stored weekly AI briefs"""
     __tablename__ = "weekly_briefs"
     
     id = Column(Integer, primary_key=True, index=True)
-    week_start = Column(DateTime, nullable=False, index=True)
+    week_start = Column(DateTime, nullable=False)
     week_end = Column(DateTime, nullable=False)
-    
-    # Content
-    title = Column(String(200), nullable=False)
+    title = Column(String(500), nullable=False)
     summary = Column(Text, nullable=False)
     market_overview = Column(Text)
-    top_performers = Column(JSON, default=list)
-    worst_performers = Column(JSON, default=list)
-    key_events = Column(JSON, default=list)
-    outlook = Column(Text)
-    
-    # Scenarios
+    crypto_top_performers = Column(JSON)
+    crypto_worst_performers = Column(JSON)
+    stock_top_performers = Column(JSON)
+    stock_worst_performers = Column(JSON)
+    key_events = Column(JSON)
     bull_case = Column(Text)
     bear_case = Column(Text)
     base_case = Column(Text)
-    
-    # Metadata
-    tier_access = Column(String(20), default="pro")  # lite, pro, elite
+    tier_required = Column(String(20), default="pro")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class WeeklyBriefService:
-    """Generate and manage weekly briefs"""
+    COINGECKO_API = "https://api.coingecko.com/api/v3"
+    
+    CRYPTO_LIST = {
+        "bitcoin": "BTC", "ethereum": "ETH", "solana": "SOL",
+        "ripple": "XRP", "dogecoin": "DOGE", "cardano": "ADA",
+        "avalanche-2": "AVAX", "chainlink": "LINK", "polkadot": "DOT",
+        "litecoin": "LTC"
+    }
+    
+    STOCK_LIST = [
+        "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA", "AMD", "INTC", "CRM",
+        "JPM", "BAC", "WFC", "GS", "MS", "V", "MA", "AXP", "BLK", "C",
+        "JNJ", "UNH", "PFE", "ABBV", "MRK", "TMO", "ABT", "DHR", "BMY", "LLY",
+        "WMT", "PG", "KO", "PEP", "COST", "MCD", "NKE", "SBUX", "HD", "LOW",
+        "XOM", "CVX", "COP", "SLB", "EOG", "MPC", "PSX", "VLO", "OXY", "HAL",
+        "CAT", "BA", "HON", "UPS", "GE", "MMM", "LMT", "RTX", "DE", "UNP",
+        "SPY", "QQQ", "DIA", "IWM", "VTI", "VOO", "VEA", "VWO", "BND", "GLD",
+        "NFLX", "DIS", "PYPL", "SQ", "SHOP", "UBER", "ABNB", "COIN", "PLTR", "SNOW"
+    ]
+    
+    FUND_LIST = [
+        "SPY", "VOO", "VTI", "QQQ", "IVV", "VEA", "VWO", "BND", "AGG", "VNQ",
+        "VXUS", "VIG", "VYM", "SCHD", "VGT", "XLF", "XLE", "XLK", "XLV", "XLI"
+    ]
+    
+    async def fetch_crypto_data(self) -> List[Dict]:
+        try:
+            ids = ",".join(self.CRYPTO_LIST.keys())
+            async with httpx.AsyncClient() as client:
+                r = await client.get(
+                    f"{self.COINGECKO_API}/coins/markets",
+                    params={
+                        "vs_currency": "usd",
+                        "ids": ids,
+                        "price_change_percentage": "7d",
+                        "order": "market_cap_desc"
+                    },
+                    timeout=15.0
+                )
+                if r.status_code == 200:
+                    data = r.json()
+                    return [
+                        {
+                            "symbol": self.CRYPTO_LIST.get(coin["id"], coin["symbol"].upper()),
+                            "name": coin["name"],
+                            "price": coin["current_price"],
+                            "change_7d": coin.get("price_change_percentage_7d_in_currency", 0) or 0,
+                            "market_cap": coin.get("market_cap", 0),
+                            "type": "crypto"
+                        }
+                        for coin in data
+                    ]
+        except Exception as e:
+            logger.error(f"Crypto fetch error: {e}")
+        return []
+    
+    async def fetch_stock_data(self) -> List[Dict]:
+        import yfinance as yf
+        from concurrent.futures import ThreadPoolExecutor
+        
+        results = []
+        all_symbols = list(set(self.STOCK_LIST + self.FUND_LIST))
+        
+        try:
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=10)
+            
+            def fetch_single(symbol):
+                try:
+                    ticker = yf.Ticker(symbol)
+                    hist = ticker.history(start=start_date, end=end_date)
+                    if len(hist) >= 2:
+                        current_price = hist['Close'].iloc[-1]
+                        week_ago_price = hist['Close'].iloc[0]
+                        change_7d = ((current_price - week_ago_price) / week_ago_price) * 100
+                        
+                        info = ticker.info
+                        return {
+                            "symbol": symbol,
+                            "name": info.get("shortName", symbol),
+                            "price": round(current_price, 2),
+                            "change_7d": round(change_7d, 2),
+                            "market_cap": info.get("marketCap", 0),
+                            "type": "etf" if symbol in self.FUND_LIST else "stock"
+                        }
+                except Exception as e:
+                    logger.warning(f"Failed to fetch {symbol}: {e}")
+                return None
+            
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                futures = list(executor.map(fetch_single, all_symbols))
+                results = [r for r in futures if r is not None]
+                
+        except Exception as e:
+            logger.error(f"Stock fetch error: {e}")
+        
+        return results
     
     async def generate_weekly_brief(self, db: Session) -> WeeklyBrief:
-        """Generate a new weekly brief"""
         now = datetime.now(timezone.utc)
-        week_start = now - timedelta(days=now.weekday(), hours=now.hour, minutes=now.minute)
-        week_end = week_start + timedelta(days=6, hours=23, minutes=59)
+        week_start = now - timedelta(days=7)
         
-        # Get market data for major assets
-        symbols = ["BTC", "ETH", "SOL", "XRP", "DOGE", "ADA"]
-        assets_data = []
+        crypto_data = await self.fetch_crypto_data()
+        stock_data = await self.fetch_stock_data()
         
-        for symbol in symbols:
-            data = await market_bias_service.get_market_data(symbol)
-            if data:
-                assets_data.append({
-                    "symbol": symbol,
-                    "price": data.get("price"),
-                    "change_24h": data.get("change_24h", 0),
-                    "change_7d": data.get("change_7d", 0)
-                })
+        crypto_sorted = sorted(crypto_data, key=lambda x: x["change_7d"], reverse=True)
+        stock_sorted = sorted(stock_data, key=lambda x: x["change_7d"], reverse=True)
         
-        # Sort by 7d performance
-        assets_data.sort(key=lambda x: x.get("change_7d", 0), reverse=True)
+        crypto_top = crypto_sorted[:3] if crypto_sorted else []
+        crypto_worst = crypto_sorted[-3:] if len(crypto_sorted) >= 3 else crypto_sorted
         
-        top_performers = assets_data[:3]
-        worst_performers = list(reversed(assets_data[-3:]))
+        stock_top = stock_sorted[:5] if stock_sorted else []
+        stock_worst = stock_sorted[-5:] if len(stock_sorted) >= 5 else stock_sorted
         
-        # Calculate overall market sentiment
-        avg_change = sum(a.get("change_7d", 0) for a in assets_data) / len(assets_data) if assets_data else 0
+        crypto_avg = sum(c["change_7d"] for c in crypto_data) / len(crypto_data) if crypto_data else 0
+        stock_avg = sum(s["change_7d"] for s in stock_data) / len(stock_data) if stock_data else 0
         
-        if avg_change > 5:
-            sentiment = "bullish"
-            outlook_text = "Markets are showing strong bullish momentum. Consider maintaining long positions but watch for overextension signals."
-        elif avg_change < -5:
-            sentiment = "bearish"
-            outlook_text = "Markets are under pressure. Consider reducing exposure and waiting for stabilization signals before adding positions."
-        else:
-            sentiment = "neutral"
-            outlook_text = "Markets are consolidating in a range. Look for breakout opportunities but maintain tight risk management."
+        overall_sentiment = "bullish" if (crypto_avg + stock_avg) / 2 > 2 else "bearish" if (crypto_avg + stock_avg) / 2 < -2 else "neutral"
         
-        # Generate brief content
-        title = f"Weekly AI Brief: {week_start.strftime('%b %d')} - {week_end.strftime('%b %d, %Y')}"
+        summary = self._generate_summary(crypto_data, stock_data, crypto_avg, stock_avg, overall_sentiment)
+        market_overview = self._generate_market_overview(crypto_avg, stock_avg, crypto_top, stock_top)
+        key_events = self._generate_key_events(crypto_data, stock_data, crypto_avg, stock_avg)
+        bull_case, bear_case, base_case = self._generate_scenarios(crypto_top, stock_top, crypto_avg, stock_avg)
         
-        summary = f"This week, the crypto market showed {sentiment} sentiment with an average 7-day change of {avg_change:.1f}%. "
-        if top_performers:
-            summary += f"{top_performers[0]['symbol']} led gains at {top_performers[0].get('change_7d', 0):.1f}%. "
-        if worst_performers and worst_performers[0].get('change_7d', 0) < 0:
-            summary += f"{worst_performers[0]['symbol']} saw the largest decline at {worst_performers[0].get('change_7d', 0):.1f}%."
-        
-        market_overview = f"""
-The overall crypto market cap {"increased" if avg_change > 0 else "decreased"} this week.
-
-Key observations:
-- Bitcoin {"maintained" if abs(assets_data[0].get('change_7d', 0) if assets_data else 0) < 3 else "showed significant movement in"} its position as market leader
-- Altcoins {"outperformed" if any(a.get('change_7d', 0) > assets_data[0].get('change_7d', 0) for a in assets_data[1:]) else "followed"} BTC's lead
-- Trading volumes {"remained elevated" if sentiment == "bullish" else "showed typical patterns"}
-""".strip()
-        
-        # Scenarios
-        btc_price = assets_data[0].get("price", 100000) if assets_data else 100000
-        
-        bull_case = f"If momentum continues, BTC could test ${int(btc_price * 1.15):,} (+15%). Key catalysts: institutional inflows, positive regulatory news, ETF momentum."
-        bear_case = f"Downside risk targets ${int(btc_price * 0.85):,} (-15%) if macro conditions deteriorate. Watch for: rate hike concerns, regulatory crackdowns, whale distribution."
-        base_case = f"Most likely scenario: Range-bound trading between ${int(btc_price * 0.95):,} and ${int(btc_price * 1.05):,} as market digests recent moves."
-        
-        # Create brief
         brief = WeeklyBrief(
             week_start=week_start,
-            week_end=week_end,
-            title=title,
+            week_end=now,
+            title=f"Weekly AI Brief: {week_start.strftime('%b %d')} - {now.strftime('%b %d, %Y')}",
             summary=summary,
             market_overview=market_overview,
-            top_performers=[{"symbol": a["symbol"], "change": a.get("change_7d", 0)} for a in top_performers],
-            worst_performers=[{"symbol": a["symbol"], "change": a.get("change_7d", 0)} for a in worst_performers],
-            key_events=[
-                "Market sentiment shifted " + sentiment,
-                f"Average 7-day change: {avg_change:.1f}%",
-                f"Top performer: {top_performers[0]['symbol'] if top_performers else 'N/A'}"
-            ],
-            outlook=outlook_text,
+            crypto_top_performers=crypto_top,
+            crypto_worst_performers=crypto_worst,
+            stock_top_performers=stock_top,
+            stock_worst_performers=stock_worst,
+            key_events=key_events,
             bull_case=bull_case,
             bear_case=bear_case,
             base_case=base_case,
-            tier_access="pro"
+            tier_required="pro"
         )
         
         db.add(brief)
         db.commit()
         db.refresh(brief)
         
-        logger.info(f"Generated weekly brief: {title}")
+        logger.info(f"Generated weekly brief: {brief.title}")
         return brief
     
-    def get_latest_brief(self, db: Session, user_tier: str = "lite") -> Optional[Dict]:
-        """Get the latest weekly brief accessible to user tier"""
-        tier_priority = {"lite": 0, "pro": 1, "elite": 2}
-        user_priority = tier_priority.get(user_tier, 0)
+    def _generate_summary(self, crypto_data, stock_data, crypto_avg, stock_avg, sentiment):
+        crypto_leader = max(crypto_data, key=lambda x: x["change_7d"]) if crypto_data else None
+        stock_leader = max(stock_data, key=lambda x: x["change_7d"]) if stock_data else None
+        crypto_laggard = min(crypto_data, key=lambda x: x["change_7d"]) if crypto_data else None
         
-        brief = db.query(WeeklyBrief).order_by(WeeklyBrief.created_at.desc()).first()
+        parts = [f"This week, markets showed {sentiment} sentiment."]
+        
+        if crypto_data:
+            parts.append(f"Crypto averaged {crypto_avg:.1f}% with {crypto_leader['symbol']} leading at {crypto_leader['change_7d']:+.1f}%.")
+        
+        if stock_data:
+            parts.append(f"Stocks averaged {stock_avg:.1f}% with {stock_leader['symbol']} top performer at {stock_leader['change_7d']:+.1f}%.")
+        
+        if crypto_laggard:
+            parts.append(f"{crypto_laggard['symbol']} saw the largest crypto decline at {crypto_laggard['change_7d']:.1f}%.")
+            
+        return " ".join(parts)
+    
+    def _generate_market_overview(self, crypto_avg, stock_avg, crypto_top, stock_top):
+        lines = []
+        
+        if crypto_avg > 0:
+            lines.append("The crypto market showed strength this week.")
+        else:
+            lines.append("The crypto market faced headwinds this week.")
+            
+        if stock_avg > 0:
+            lines.append("Traditional equities posted gains.")
+        else:
+            lines.append("Traditional equities pulled back.")
+        
+        lines.append("\nKey observations:")
+        lines.append("- Bitcoin continues to influence overall crypto sentiment")
+        lines.append("- Tech stocks remain a key driver of equity performance")
+        lines.append("- Trading volumes showed typical weekly patterns")
+        
+        return "\n".join(lines)
+    
+    def _generate_key_events(self, crypto_data, stock_data, crypto_avg, stock_avg):
+        events = []
+        
+        overall = (crypto_avg + stock_avg) / 2
+        if overall > 3:
+            events.append("Market sentiment shifted bullish")
+        elif overall < -3:
+            events.append("Market sentiment shifted bearish")
+        else:
+            events.append("Markets traded in a consolidation range")
+        
+        events.append(f"Crypto 7-day average: {crypto_avg:+.1f}%")
+        events.append(f"Stock 7-day average: {stock_avg:+.1f}%")
+        
+        if crypto_data:
+            top_crypto = max(crypto_data, key=lambda x: x["change_7d"])
+            events.append(f"Top crypto performer: {top_crypto['symbol']}")
+            
+        if stock_data:
+            top_stock = max(stock_data, key=lambda x: x["change_7d"])
+            events.append(f"Top stock performer: {top_stock['symbol']}")
+        
+        return events
+    
+    def _generate_scenarios(self, crypto_top, stock_top, crypto_avg, stock_avg):
+        bull = "If momentum continues, we could see:\n"
+        if crypto_top:
+            bull += f"- {crypto_top[0]['symbol']} potentially reaching ${crypto_top[0]['price'] * 1.15:,.0f}\n"
+        if stock_top:
+            bull += f"- {stock_top[0]['symbol']} testing ${stock_top[0]['price'] * 1.10:.2f}\n"
+        bull += "- Increased institutional inflows\n- Positive sentiment driving FOMO buying"
+        
+        bear = "Downside risks include:\n"
+        if crypto_top:
+            bear += f"- {crypto_top[0]['symbol']} retracing to ${crypto_top[0]['price'] * 0.85:,.0f}\n"
+        if stock_top:
+            bear += f"- {stock_top[0]['symbol']} pulling back to ${stock_top[0]['price'] * 0.90:.2f}\n"
+        bear += "- Macro headwinds from rate decisions\n- Risk-off sentiment in global markets"
+        
+        base = "Most likely scenario:\n"
+        if crypto_top:
+            base += f"- {crypto_top[0]['symbol']} consolidating around ${crypto_top[0]['price'] * 1.02:,.0f}\n"
+        if stock_top:
+            base += f"- {stock_top[0]['symbol']} ranging near ${stock_top[0]['price'] * 1.02:.2f}\n"
+        base += "- Continued sector rotation\n- Normal volatility patterns"
+        
+        return bull, bear, base
+    
+    def get_latest_brief(self, db: Session, user_tier: str = "free") -> Optional[Dict]:
+        brief = db.query(WeeklyBrief).order_by(desc(WeeklyBrief.created_at)).first()
         
         if not brief:
             return None
         
-        brief_priority = tier_priority.get(brief.tier_access, 1)
+        tier_access = {"free": 0, "lite": 1, "pro": 2, "elite": 3, "admin": 4}
+        required_access = tier_access.get(brief.tier_required, 2)
+        user_access = tier_access.get(user_tier, 0)
         
-        # Check access
-        if user_priority < brief_priority:
+        if user_access < required_access:
             return {
-                "locked": True,
+                "id": brief.id,
                 "title": brief.title,
-                "summary": brief.summary[:100] + "...",
-                "required_tier": brief.tier_access,
-                "message": f"Upgrade to {brief.tier_access.upper()} to access the full weekly brief"
+                "summary": brief.summary[:200] + "...",
+                "locked": True,
+                "tier_required": brief.tier_required
             }
         
         return {
-            "locked": False,
             "id": brief.id,
             "title": brief.title,
             "week_start": brief.week_start.isoformat(),
             "week_end": brief.week_end.isoformat(),
             "summary": brief.summary,
             "market_overview": brief.market_overview,
-            "top_performers": brief.top_performers,
-            "worst_performers": brief.worst_performers,
+            "crypto_top_performers": brief.crypto_top_performers,
+            "crypto_worst_performers": brief.crypto_worst_performers,
+            "stock_top_performers": brief.stock_top_performers,
+            "stock_worst_performers": brief.stock_worst_performers,
             "key_events": brief.key_events,
-            "outlook": brief.outlook,
             "bull_case": brief.bull_case,
             "bear_case": brief.bear_case,
             "base_case": brief.base_case,
+            "locked": False,
             "created_at": brief.created_at.isoformat()
         }
     
     def get_all_briefs(self, db: Session, limit: int = 10) -> List[Dict]:
-        """Get list of all briefs (for archive)"""
-        briefs = db.query(WeeklyBrief).order_by(WeeklyBrief.created_at.desc()).limit(limit).all()
-        
+        briefs = db.query(WeeklyBrief).order_by(desc(WeeklyBrief.created_at)).limit(limit).all()
         return [
             {
                 "id": b.id,
                 "title": b.title,
                 "week_start": b.week_start.isoformat(),
-                "summary": b.summary[:150] + "..." if len(b.summary) > 150 else b.summary,
+                "week_end": b.week_end.isoformat(),
+                "summary": b.summary[:150] + "...",
                 "created_at": b.created_at.isoformat()
             }
             for b in briefs
