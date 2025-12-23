@@ -72,3 +72,16 @@ def stop_scheduler():
     """Stop the scheduler"""
     scheduler.shutdown()
     logger.info("Background scheduler stopped")
+
+
+def get_scheduled_jobs():
+    """Get list of scheduled jobs"""
+    jobs = scheduler.get_jobs()
+    return [
+        {
+            "id": job.id,
+            "name": job.name,
+            "next_run": job.next_run_time.isoformat() if job.next_run_time else None
+        }
+        for job in jobs
+    ]
