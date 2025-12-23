@@ -77,6 +77,8 @@ async def startup_event():
     from app.models.signal import Signal
     from app.models.chart import ChartUpload, ChartAnalysisResult
     Base.metadata.create_all(bind=engine)
+    from app.db.migrations import run_migrations
+    run_migrations(engine)
     logger.info("✅ Database tables ready")
     start_scheduler()
 
