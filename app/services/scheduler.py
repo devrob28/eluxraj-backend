@@ -1,147 +1,74 @@
 """
-ELUXRAJ Scheduler Service
-Runs periodic tasks: portfolio scans, alert checks, data updates
+Background Scheduler
+Run periodic jobs like alert monitoring
 """
-import asyncio
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 from datetime import datetime, timezone
 from app.core.logging import logger
+from app.db.session import SessionLocal
 
 
-class Scheduler:
-    """Simple task scheduler for periodic jobs"""
-    
-    def __init__(self):
-        self.tasks = {}
-        self.running = False
-    
-    def add_task(self, name: str, interval_seconds: int, func):
-        """Add a periodic task"""
-        self.tasks[name] = {
-            "interval": interval_seconds,
-            "func": func,
-            "last_run": None
-        }
-    
-    async def run_task(self, name: str):
-        """Run a single task"""
-        task = self.tasks.get(name)
-        if not task:
-            return
-        
-        try:
-            logger.info(f"Running scheduled task: {name}")
-            if asyncio.iscoroutinefunction(task["func"]):
-                await task["func"]()
-            else:
-                task["func"]()
-            task["last_run"] = datetime.now(timezone.utc)
-            logger.info(f"Task {name} completed")
-        except Exception as e:
-            logger.error(f"Task {name} failed: {e}")
-    
-    async def start(self):
-        """Start the scheduler loop"""
-        self.running = True
-        logger.info("Scheduler started")
-        
-        while self.running:
-            now = datetime.now(timezone.utc)
-            
-            for name, task in self.tasks.items():
-                # Check if task should run
-                if task["last_run"] is None:
-                    should_run = True
-                else:
-                    elapsed = (now - task["last_run"]).total_seconds()
-                    should_run = elapsed >= task["interval"]
-                
-                if should_run:
-                    asyncio.create_task(self.run_task(name))
-            
-            # Sleep before checking again
-            await asyncio.sleep(60)  # Check every minute
-    
-    def stop(self):
-        """Stop the scheduler"""
-        self.running = False
-        logger.info("Scheduler stopped")
+scheduler = AsyncIOScheduler()
 
 
-# Global scheduler instance
-scheduler = Scheduler()
-
-
-async def hourly_portfolio_scan():
-    """Scan all users' watchlist assets hourly"""
-    from app.db.session import SessionLocal
-    from app.services.oracle import oracle
-    from app.api.endpoints.alerts import check_and_trigger_alerts
+async def check_alerts_job():
+    """Job to check and trigger alerts"""
+    from app.services.alert_monitor import alert_monitor
     
     db = SessionLocal()
     try:
-        # Get unique assets from all alert rules
-        from app.api.endpoints.alerts import AlertRule
-        rules = db.query(AlertRule).filter(AlertRule.is_active == True).all()
-        assets = list(set(r.asset for r in rules))
-        
-        logger.info(f"Hourly scan: {len(assets)} assets")
-        
-        for asset in assets:
-            try:
-                signal = await oracle.generate_signal(asset)
-                if signal:
-                    score = signal.get("oracle_score", 50)
-                    await check_and_trigger_alerts(asset, "oracle_score", score, db)
-            except Exception as e:
-                logger.error(f"Scan error for {asset}: {e}")
-        
+        result = await alert_monitor.run_alert_check(db)
+        logger.info(f"Alert job completed: {result['triggered_count']} triggered")
+    except Exception as e:
+        logger.error(f"Alert job error: {e}")
     finally:
         db.close()
 
 
-async def whale_alert_check():
-    """Check for significant whale movements"""
-    from app.db.session import SessionLocal
-    from app.api.endpoints.alerts import check_and_trigger_alerts
+async def generate_weekly_brief_job():
+    """Job to generate weekly brief on Sundays"""
+    from app.services.weekly_brief import weekly_brief_service
+    
+    # Only run on Sundays
+    if datetime.now(timezone.utc).weekday() != 6:
+        return
     
     db = SessionLocal()
     try:
-        # TODO: Integrate with whale tracking API
-        # For now, this is a placeholder
-        logger.info("Whale alert check running")
+        await weekly_brief_service.generate_weekly_brief(db)
+        logger.info("Weekly brief generated")
+    except Exception as e:
+        logger.error(f"Weekly brief job error: {e}")
     finally:
         db.close()
 
 
-def setup_scheduler():
-    """Configure scheduled tasks"""
-    # Hourly portfolio scan
-    scheduler.add_task("hourly_scan", 3600, hourly_portfolio_scan)
+def start_scheduler():
+    """Start the background scheduler"""
+    # Check alerts every 2 minutes
+    scheduler.add_job(
+        check_alerts_job,
+        IntervalTrigger(minutes=2),
+        id="alert_check",
+        name="Check price alerts",
+        replace_existing=True
+    )
     
-    # Whale alerts every 5 minutes
-    scheduler.add_task("whale_check", 300, whale_alert_check)
+    # Check for weekly brief generation daily at 00:00 UTC
+    scheduler.add_job(
+        generate_weekly_brief_job,
+        IntervalTrigger(hours=24),
+        id="weekly_brief",
+        name="Generate weekly brief",
+        replace_existing=True
+    )
     
-    logger.info("Scheduler tasks configured")
-
-
-async def start_scheduler():
-    """Start the scheduler (call from main.py)"""
-    setup_scheduler()
-    await scheduler.start()
+    scheduler.start()
+    logger.info("Background scheduler started")
 
 
 def stop_scheduler():
     """Stop the scheduler"""
-    scheduler.stop()
-
-
-def get_scheduled_jobs():
-    """Get list of scheduled jobs"""
-    return [
-        {
-            "name": name,
-            "interval": task["interval"],
-            "last_run": task["last_run"].isoformat() if task["last_run"] else None
-        }
-        for name, task in scheduler.tasks.items()
-    ]
+    scheduler.shutdown()
+    logger.info("Background scheduler stopped")

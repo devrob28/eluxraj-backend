@@ -175,3 +175,27 @@ async def admin_reset_password(email: str, new_password: str, db: Session = Depe
     
     logger.info(f"Password reset for {email} by admin")
     return {"ok": True, "message": f"Password reset for {email}"}
+
+
+class UpdatePhoneRequest(BaseModel):
+    phone: str
+
+
+@router.put("/phone")
+async def update_phone(req: UpdatePhoneRequest, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Update user phone number for SMS alerts"""
+    # Clean phone number
+    phone = req.phone.replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
+    if not phone.startswith("+"):
+        phone = "+1" + phone  # Default to US
+    
+    user.phone = phone
+    db.commit()
+    
+    return {"ok": True, "message": "Phone number updated", "phone": phone}
+
+
+@router.get("/phone")
+async def get_phone(user=Depends(get_current_user)):
+    """Get user phone number"""
+    return {"ok": True, "phone": getattr(user, 'phone', None)}

@@ -514,3 +514,67 @@ async def get_scan_history(
             for s in scans
         ]
     }
+
+
+# ============== ALERT MONITOR ENDPOINTS ==============
+
+@router.get("/status")
+async def get_alert_status(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Get alert system status for current user"""
+    rules = db.query(AlertRule).filter(
+        AlertRule.user_id == user.id,
+        AlertRule.is_active == True
+    ).all()
+    
+    return {
+        "ok": True,
+        "active_alerts": len(rules),
+        "alerts": [
+            {
+                "id": r.id,
+                "name": r.name,
+                "asset": r.asset,
+                "condition": r.condition,
+                "threshold": r.threshold,
+                "notify_email": r.notify_email,
+                "notify_sms": r.notify_sms,
+                "notify_push": r.notify_push,
+                "last_triggered": r.last_triggered.isoformat() if r.last_triggered else None,
+                "trigger_count": r.trigger_count
+            }
+            for r in rules
+        ]
+    }
+
+
+@router.post("/test-notification")
+async def test_notification(user=Depends(get_current_user)):
+    """Send a test notification to verify setup"""
+    from app.services.notification_service import notification_service
+    
+    result = await notification_service.send_alert_notification(
+        user_email=user.email,
+        user_phone=getattr(user, 'phone', None),
+        alert_name="Test Alert",
+        asset="BTC",
+        condition="above",
+        threshold=100000,
+        current_price=100001,
+        notify_email=True,
+        notify_sms=bool(getattr(user, 'phone', None)),
+        notify_push=False
+    )
+    
+    return {"ok": True, "message": "Test notification sent", "result": result}
+
+
+@router.post("/check-now")
+async def trigger_alert_check(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Manually trigger alert check (admin/elite only)"""
+    if user.subscription_tier not in ["admin", "elite"] and not getattr(user, "is_admin", False):
+        raise HTTPException(status_code=403, detail="Elite or admin required")
+    
+    from app.services.alert_monitor import alert_monitor
+    result = await alert_monitor.run_alert_check(db)
+    
+    return {"ok": True, "result": result}
