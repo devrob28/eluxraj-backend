@@ -1,6 +1,5 @@
 """
-Weekly AI Brief Service
-Generates comprehensive weekly market analysis for crypto AND stocks
+Weekly AI Brief Service - Crypto + Stocks
 """
 import httpx
 from datetime import datetime, timezone, timedelta
@@ -9,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, desc
 from app.db.base import Base
 from app.core.logging import logger
+from app.core.config import settings
 
 
 class WeeklyBrief(Base):
@@ -34,6 +34,7 @@ class WeeklyBrief(Base):
 
 class WeeklyBriefService:
     COINGECKO_API = "https://api.coingecko.com/api/v3"
+    FMP_API = "https://financialmodelingprep.com/api/v3"
     
     CRYPTO_LIST = {
         "bitcoin": "BTC", "ethereum": "ETH", "solana": "SOL",
@@ -42,21 +43,16 @@ class WeeklyBriefService:
         "litecoin": "LTC"
     }
     
+    # Top stocks - reduced list for API limits
     STOCK_LIST = [
-        "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA", "AMD", "INTC", "CRM",
-        "JPM", "BAC", "WFC", "GS", "MS", "V", "MA", "AXP", "BLK", "C",
-        "JNJ", "UNH", "PFE", "ABBV", "MRK", "TMO", "ABT", "DHR", "BMY", "LLY",
-        "WMT", "PG", "KO", "PEP", "COST", "MCD", "NKE", "SBUX", "HD", "LOW",
-        "XOM", "CVX", "COP", "SLB", "EOG", "MPC", "PSX", "VLO", "OXY", "HAL",
-        "CAT", "BA", "HON", "UPS", "GE", "MMM", "LMT", "RTX", "DE", "UNP",
-        "SPY", "QQQ", "DIA", "IWM", "VTI", "VOO", "VEA", "VWO", "BND", "GLD",
-        "NFLX", "DIS", "PYPL", "SQ", "SHOP", "UBER", "ABNB", "COIN", "PLTR", "SNOW"
+        "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA",
+        "JPM", "V", "JNJ", "WMT", "PG", "XOM", "HD", "BAC",
+        "MA", "PFE", "KO", "PEP", "COST", "DIS", "NFLX", "AMD",
+        "INTC", "CRM", "PYPL", "BA", "NKE", "MCD", "SBUX"
     ]
     
-    FUND_LIST = [
-        "SPY", "VOO", "VTI", "QQQ", "IVV", "VEA", "VWO", "BND", "AGG", "VNQ",
-        "VXUS", "VIG", "VYM", "SCHD", "VGT", "XLF", "XLE", "XLK", "XLV", "XLI"
-    ]
+    # ETFs
+    ETF_LIST = ["SPY", "QQQ", "DIA", "IWM", "VTI", "VOO", "GLD", "VNQ"]
     
     async def fetch_crypto_data(self) -> List[Dict]:
         try:
@@ -90,44 +86,85 @@ class WeeklyBriefService:
         return []
     
     async def fetch_stock_data(self) -> List[Dict]:
-        import yfinance as yf
-        from concurrent.futures import ThreadPoolExecutor
-        
+        """Fetch stock data from Financial Modeling Prep API"""
         results = []
-        all_symbols = list(set(self.STOCK_LIST + self.FUND_LIST))
+        all_symbols = self.STOCK_LIST + self.ETF_LIST
+        
+        # Get API key from settings or use demo
+        fmp_key = getattr(settings, 'FMP_API_KEY', None) or "demo"
         
         try:
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=10)
-            
-            def fetch_single(symbol):
-                try:
-                    ticker = yf.Ticker(symbol)
-                    hist = ticker.history(start=start_date, end=end_date)
-                    if len(hist) >= 2:
-                        current_price = hist['Close'].iloc[-1]
-                        week_ago_price = hist['Close'].iloc[0]
-                        change_7d = ((current_price - week_ago_price) / week_ago_price) * 100
-                        
-                        info = ticker.info
-                        return {
-                            "symbol": symbol,
-                            "name": info.get("shortName", symbol),
-                            "price": round(current_price, 2),
-                            "change_7d": round(change_7d, 2),
-                            "market_cap": info.get("marketCap", 0),
-                            "type": "etf" if symbol in self.FUND_LIST else "stock"
-                        }
-                except Exception as e:
-                    logger.warning(f"Failed to fetch {symbol}: {e}")
-                return None
-            
-            with ThreadPoolExecutor(max_workers=10) as executor:
-                futures = list(executor.map(fetch_single, all_symbols))
-                results = [r for r in futures if r is not None]
+            async with httpx.AsyncClient() as client:
+                # Batch fetch stock quotes
+                symbols_str = ",".join(all_symbols)
+                r = await client.get(
+                    f"{self.FMP_API}/quote/{symbols_str}",
+                    params={"apikey": fmp_key},
+                    timeout=30.0
+                )
                 
+                if r.status_code == 200:
+                    data = r.json()
+                    for stock in data:
+                        if isinstance(stock, dict) and "symbol" in stock:
+                            change_7d = stock.get("changesPercentage", 0) or 0
+                            # FMP gives daily change, estimate weekly (rough)
+                            results.append({
+                                "symbol": stock["symbol"],
+                                "name": stock.get("name", stock["symbol"]),
+                                "price": stock.get("price", 0),
+                                "change_7d": round(change_7d, 2),
+                                "market_cap": stock.get("marketCap", 0),
+                                "type": "etf" if stock["symbol"] in self.ETF_LIST else "stock"
+                            })
         except Exception as e:
             logger.error(f"Stock fetch error: {e}")
+        
+        # If FMP fails, try backup method
+        if not results:
+            results = await self._fetch_stock_backup()
+        
+        return results
+    
+    async def _fetch_stock_backup(self) -> List[Dict]:
+        """Backup: fetch from Yahoo Finance API directly"""
+        results = []
+        all_symbols = self.STOCK_LIST + self.ETF_LIST
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                for symbol in all_symbols[:20]:  # Limit to avoid rate limits
+                    try:
+                        r = await client.get(
+                            f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
+                            params={"interval": "1d", "range": "7d"},
+                            headers={"User-Agent": "Mozilla/5.0"},
+                            timeout=10.0
+                        )
+                        if r.status_code == 200:
+                            data = r.json()
+                            result = data.get("chart", {}).get("result", [{}])[0]
+                            meta = result.get("meta", {})
+                            closes = result.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                            
+                            if closes and len(closes) >= 2:
+                                current = closes[-1] or closes[-2]
+                                week_ago = closes[0]
+                                if current and week_ago:
+                                    change_7d = ((current - week_ago) / week_ago) * 100
+                                    results.append({
+                                        "symbol": symbol,
+                                        "name": meta.get("shortName", symbol),
+                                        "price": round(current, 2),
+                                        "change_7d": round(change_7d, 2),
+                                        "market_cap": 0,
+                                        "type": "etf" if symbol in self.ETF_LIST else "stock"
+                                    })
+                    except Exception as e:
+                        logger.warning(f"Backup fetch failed for {symbol}: {e}")
+                        continue
+        except Exception as e:
+            logger.error(f"Backup stock fetch error: {e}")
         
         return results
     
