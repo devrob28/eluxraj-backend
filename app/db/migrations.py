@@ -18,8 +18,14 @@ def run_migrations(engine):
         except Exception as e:
             logger.warning(f"Migration note: {e}")
 
-        # Add stock columns to weekly_briefs if not exists
+        # Add all columns to weekly_briefs
         try:
+            conn.execute(text("""
+                ALTER TABLE weekly_briefs ADD COLUMN IF NOT EXISTS crypto_top_performers JSON
+            """))
+            conn.execute(text("""
+                ALTER TABLE weekly_briefs ADD COLUMN IF NOT EXISTS crypto_worst_performers JSON
+            """))
             conn.execute(text("""
                 ALTER TABLE weekly_briefs ADD COLUMN IF NOT EXISTS stock_top_performers JSON
             """))
@@ -27,6 +33,6 @@ def run_migrations(engine):
                 ALTER TABLE weekly_briefs ADD COLUMN IF NOT EXISTS stock_worst_performers JSON
             """))
             conn.commit()
-            logger.info("✅ Migration: stock columns ready")
+            logger.info("✅ Migration: weekly_briefs columns ready")
         except Exception as e:
             logger.warning(f"Migration note: {e}")
