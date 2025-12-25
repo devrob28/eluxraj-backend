@@ -33,31 +33,9 @@ class WeeklyBrief(Base):
 
 
 class WeeklyBriefService:
-    BINANCE_API = "https://api.binance.com/api/v3"
     FMP_API = "https://financialmodelingprep.com/api/v3"
     
-    # Binance trading pairs (USDT pairs)
-    CRYPTO_SYMBOLS = {
-        "BTCUSDT": "BTC",
-        "ETHUSDT": "ETH", 
-        "SOLUSDT": "SOL",
-        "XRPUSDT": "XRP",
-        "DOGEUSDT": "DOGE",
-        "ADAUSDT": "ADA",
-        "AVAXUSDT": "AVAX",
-        "LINKUSDT": "LINK",
-        "DOTUSDT": "DOT",
-        "LTCUSDT": "LTC",
-        "MATICUSDT": "MATIC",
-        "SHIBUSDT": "SHIB"
-    }
-    
-    CRYPTO_NAMES = {
-        "BTC": "Bitcoin", "ETH": "Ethereum", "SOL": "Solana",
-        "XRP": "XRP", "DOGE": "Dogecoin", "ADA": "Cardano",
-        "AVAX": "Avalanche", "LINK": "Chainlink", "DOT": "Polkadot",
-        "LTC": "Litecoin", "MATIC": "Polygon", "SHIB": "Shiba Inu"
-    }
+    CRYPTO_IDS = "bitcoin,ethereum,solana,ripple,dogecoin,cardano,avalanche-2,chainlink,polkadot,litecoin,matic-network,shiba-inu"
     
     STOCK_LIST = [
         "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA",
@@ -69,98 +47,42 @@ class WeeklyBriefService:
     ETF_LIST = ["SPY", "QQQ", "DIA", "IWM", "VTI", "VOO", "GLD", "VNQ"]
     
     async def fetch_crypto_data(self) -> List[Dict]:
-        """Fetch real-time crypto data from Binance"""
+        """Fetch crypto data from CoinGecko (primary source)"""
         results = []
         
         try:
-            async with httpx.AsyncClient() as client:
-                # Get 24hr ticker for all pairs at once
-                r = await client.get(
-                    f"{self.BINANCE_API}/ticker/24hr",
-                    timeout=15.0
-                )
-                
-                if r.status_code == 200:
-                    all_tickers = r.json()
-                    
-                    # Filter to our symbols
-                    for ticker in all_tickers:
-                        symbol = ticker.get("symbol")
-                        if symbol in self.CRYPTO_SYMBOLS:
-                            short_symbol = self.CRYPTO_SYMBOLS[symbol]
-                            price = float(ticker.get("lastPrice", 0))
-                            change_24h = float(ticker.get("priceChangePercent", 0))
-                            
-                            results.append({
-                                "symbol": short_symbol,
-                                "name": self.CRYPTO_NAMES.get(short_symbol, short_symbol),
-                                "price": price,
-                                "change_24h": round(change_24h, 2),
-                                "change_7d": round(change_24h, 2),  # Will update with 7d data
-                                "volume": float(ticker.get("quoteVolume", 0)),
-                                "type": "crypto"
-                            })
-                    
-                    # Now get 7-day change using klines
-                    for result in results:
-                        symbol_pair = f"{result['symbol']}USDT"
-                        try:
-                            kr = await client.get(
-                                f"{self.BINANCE_API}/klines",
-                                params={
-                                    "symbol": symbol_pair,
-                                    "interval": "1d",
-                                    "limit": 8
-                                },
-                                timeout=10.0
-                            )
-                            if kr.status_code == 200:
-                                klines = kr.json()
-                                if len(klines) >= 7:
-                                    price_7d_ago = float(klines[0][1])  # Open price 7 days ago
-                                    current_price = float(klines[-1][4])  # Close price now
-                                    change_7d = ((current_price - price_7d_ago) / price_7d_ago) * 100
-                                    result["change_7d"] = round(change_7d, 2)
-                        except Exception as e:
-                            logger.warning(f"Failed to get 7d data for {symbol_pair}: {e}")
-                            
-        except Exception as e:
-            logger.error(f"Binance API error: {e}")
-            # Fallback to CoinGecko
-            return await self._fetch_crypto_coingecko()
-        
-        return results
-    
-    async def _fetch_crypto_coingecko(self) -> List[Dict]:
-        """Fallback to CoinGecko if Binance fails"""
-        try:
-            ids = "bitcoin,ethereum,solana,ripple,dogecoin,cardano,avalanche-2,chainlink,polkadot,litecoin"
             async with httpx.AsyncClient() as client:
                 r = await client.get(
                     "https://api.coingecko.com/api/v3/coins/markets",
                     params={
                         "vs_currency": "usd",
-                        "ids": ids,
+                        "ids": self.CRYPTO_IDS,
+                        "order": "market_cap_desc",
                         "price_change_percentage": "24h,7d"
                     },
                     timeout=15.0
                 )
+                
                 if r.status_code == 200:
                     data = r.json()
-                    return [
-                        {
+                    for coin in data:
+                        results.append({
                             "symbol": coin["symbol"].upper(),
                             "name": coin["name"],
                             "price": coin["current_price"],
-                            "change_24h": coin.get("price_change_percentage_24h", 0) or 0,
-                            "change_7d": coin.get("price_change_percentage_7d_in_currency", 0) or 0,
+                            "change_24h": round(coin.get("price_change_percentage_24h") or 0, 2),
+                            "change_7d": round(coin.get("price_change_percentage_7d_in_currency") or 0, 2),
+                            "volume": coin.get("total_volume", 0),
                             "type": "crypto"
-                        }
-                        for coin in data
-                    ]
+                        })
+                    logger.info(f"CoinGecko returned {len(results)} crypto assets")
+                else:
+                    logger.error(f"CoinGecko API error: {r.status_code}")
+                    
         except Exception as e:
-            logger.error(f"CoinGecko fallback error: {e}")
-        return []
+            logger.error(f"Crypto fetch error: {e}")
+        
+        return results
     
     async def fetch_stock_data(self) -> List[Dict]:
         """Fetch stock data from Financial Modeling Prep API"""
