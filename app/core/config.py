@@ -33,3 +33,6 @@ class Settings(BaseSettings):
         case_sensitive = True
 
 settings = Settings()
+
+    VAPID_PRIVATE_KEY: Optional[str] = os.getenv("VAPID_PRIVATE_KEY")
+    VAPID_PUBLIC_KEY: Optional[str] = os.getenv("VAPID_PUBLIC_KEY")

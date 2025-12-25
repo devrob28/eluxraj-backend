@@ -562,7 +562,8 @@ async def test_notification(user=Depends(get_current_user)):
         current_price=100001,
         notify_email=True,
         notify_sms=bool(getattr(user, 'phone', None)),
-        notify_push=False
+        notify_push=True,
+        push_subscription=getattr(user, "push_subscription", None)
     )
     
     return {"ok": True, "message": "Test notification sent", "result": result}

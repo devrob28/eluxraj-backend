@@ -32,3 +32,13 @@ def run_migrations(engine):
             logger.info("✅ Migration: weekly_briefs columns ready")
         except Exception as e:
             logger.warning(f"Migration note: {e}")
+
+def add_push_subscription_column(engine):
+    """Add push_subscription column to users table"""
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS push_subscription JSON"))
+            conn.commit()
+            logger.info("Added push_subscription column")
+        except Exception as e:
+            logger.warning(f"push_subscription column may already exist: {e}")

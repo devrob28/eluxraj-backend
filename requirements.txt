@@ -26,3 +26,4 @@ numpy<2
 # force 1765162206
 yfinance==0.2.36
 yfinance==0.2.36
+pywebpush>=2.0.0
