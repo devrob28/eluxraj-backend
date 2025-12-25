@@ -28,11 +28,13 @@ class Settings(BaseSettings):
     SENDGRID_API_KEY: Optional[str] = os.getenv("SENDGRID_API_KEY")
     FROM_EMAIL: str = os.getenv("FROM_EMAIL", "signals@eluxraj.ai")
     
+    # Push Notifications
+    VAPID_PRIVATE_KEY: Optional[str] = os.getenv("VAPID_PRIVATE_KEY")
+    VAPID_PUBLIC_KEY: Optional[str] = os.getenv("VAPID_PUBLIC_KEY")
+
     class Config:
         env_file = ".env"
         case_sensitive = True
 
 settings = Settings()
 
-    VAPID_PRIVATE_KEY: Optional[str] = os.getenv("VAPID_PRIVATE_KEY")
-    VAPID_PUBLIC_KEY: Optional[str] = os.getenv("VAPID_PUBLIC_KEY")
