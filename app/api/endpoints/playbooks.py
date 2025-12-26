@@ -112,6 +112,23 @@ async def generate_playbook(
         "disclaimer": "ELUXRAJ provides AI-powered decision intelligence for informational purposes only. This is NOT financial advice. All trading involves risk. Past performance does not guarantee future results."
     }
 
+@router.get("/history")
+async def get_playbook_history(
+    user = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    limit: int = Query(20, le=100)
+):
+    """Get user playbook history (all status)"""
+    playbooks = db.query(TradePlaybook).filter(
+        TradePlaybook.user_id == user.id
+    ).order_by(TradePlaybook.created_at.desc()).limit(limit).all()
+    
+    return {
+        "count": len(playbooks),
+        "playbooks": [_format_playbook(p) for p in playbooks]
+    }
+
+
 @router.get("/active")
 async def get_active_playbooks(
     user = Depends(get_current_user),
