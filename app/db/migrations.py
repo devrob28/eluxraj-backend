@@ -42,3 +42,42 @@ def add_push_subscription_column(engine):
             logger.info("Added push_subscription column")
         except Exception as e:
             logger.warning(f"push_subscription column may already exist: {e}")
+
+def add_playbook_tables(engine):
+    """Add trade_playbooks table"""
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS trade_playbooks (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id),
+                    asset VARCHAR(50) NOT NULL,
+                    asset_type VARCHAR(20) NOT NULL,
+                    timeframe VARCHAR(10) NOT NULL,
+                    market_bias VARCHAR(20) NOT NULL,
+                    bias_strength FLOAT NOT NULL,
+                    entry_zone_low FLOAT NOT NULL,
+                    entry_zone_high FLOAT NOT NULL,
+                    stop_loss FLOAT NOT NULL,
+                    take_profit_1 FLOAT NOT NULL,
+                    take_profit_2 FLOAT NOT NULL,
+                    take_profit_3 FLOAT NOT NULL,
+                    risk_reward_ratio FLOAT NOT NULL,
+                    probability_score FLOAT NOT NULL,
+                    confidence_score FLOAT NOT NULL,
+                    bullish_scenarios JSON,
+                    bearish_scenarios JSON,
+                    invalidation_conditions JSON,
+                    invalidation_price FLOAT,
+                    pattern_detected VARCHAR(100),
+                    market_structure VARCHAR(50),
+                    reasoning TEXT,
+                    status VARCHAR(20) DEFAULT 'active',
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    expires_at TIMESTAMP WITH TIME ZONE
+                )
+            """))
+            conn.commit()
+            logger.info("Created trade_playbooks table")
+        except Exception as e:
+            logger.warning(f"trade_playbooks table may exist: {e}")

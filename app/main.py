@@ -13,7 +13,7 @@ from app.core.exceptions import (
     sqlalchemy_exception_handler,
     generic_exception_handler
 )
-from app.api.endpoints import auth, prices, push, signals, oracle, alerts, admin, admin_ui, legal, transparency, content, public, marketing, chart_analysis, whale, paper_trading, watchlist, daily_brief, weekly_brief, brokerage, performance, weekly_brief
+from app.api.endpoints import auth, prices, push, playbooks, signals, oracle, alerts, admin, admin_ui, legal, transparency, content, public, marketing, chart_analysis, whale, paper_trading, watchlist, daily_brief, weekly_brief, brokerage, performance, weekly_brief
 from app.services.scheduler import start_scheduler, stop_scheduler, get_scheduled_jobs
 
 setup_logging(debug=settings.DEBUG)
@@ -64,6 +64,7 @@ app.include_router(brokerage.router, prefix="/api/v1/brokerage", tags=["Brokerag
 app.include_router(performance.router, prefix="/api/v1/performance", tags=["Performance"])
 app.include_router(prices.router, prefix="/api/v1/prices", tags=["Prices"])
 app.include_router(push.router, prefix="/api/v1/push", tags=["Push Notifications"])
+app.include_router(playbooks.router, prefix="/api/v1/playbooks", tags=["Trade Playbooks"])
 app.include_router(weekly_brief.router, prefix="/api/v1/weekly-brief", tags=["Weekly Brief"])
 app.include_router(brokerage.router, prefix="/api/v1/brokerage", tags=["Brokerage"])
 
