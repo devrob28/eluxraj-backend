@@ -103,3 +103,36 @@ def add_api_usage_table(engine):
             logger.info("Created api_usage table")
         except Exception as e:
             logger.warning(f"api_usage table may exist: {e}")
+
+
+def add_chart_analyses_table(engine):
+    """Add chart_analyses table for history"""
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS chart_analyses (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    asset VARCHAR(50) NOT NULL,
+                    timeframe VARCHAR(20) NOT NULL,
+                    pattern_detected VARCHAR(100),
+                    market_structure VARCHAR(50),
+                    key_levels JSON,
+                    trade_recommendation VARCHAR(20),
+                    trade_setup JSON,
+                    bullish_scenarios JSON,
+                    bearish_scenarios JSON,
+                    invalidation_conditions JSON,
+                    confidence_score FLOAT DEFAULT 0,
+                    reasoning TEXT,
+                    status VARCHAR(20) DEFAULT 'active',
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+                
+                CREATE INDEX IF NOT EXISTS idx_chart_analyses_user 
+                ON chart_analyses(user_id, created_at DESC);
+            """))
+            conn.commit()
+            logger.info("Created chart_analyses table")
+        except Exception as e:
+            logger.warning(f"chart_analyses table may exist: {e}")

@@ -1,10 +1,9 @@
 """Chart Analysis V2 - AI Vision Trade Intelligence"""
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Depends
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 import os
 import shutil
-import json
 from uuid import uuid4
 
 from app.db.session import get_db
@@ -12,6 +11,7 @@ from app.core.deps import get_current_user
 from app.core.logging import logger
 from app.services.trade_intelligence import trade_intelligence
 from app.services.rate_limiter import rate_limiter
+from app.models.chart_analysis import ChartAnalysis
 
 router = APIRouter()
 
@@ -81,6 +81,33 @@ async def analyze_chart(
             asset=asset.upper(),
             timeframe=timeframe
         )
+        
+        # Save to database
+        try:
+            chart_record = ChartAnalysis(
+                user_id=user.id,
+                asset=asset.upper(),
+                timeframe=timeframe,
+                pattern_detected=analysis.get("pattern_detected"),
+                market_structure=analysis.get("market_structure"),
+                key_levels=analysis.get("key_levels"),
+                trade_recommendation=analysis.get("trade_recommendation"),
+                trade_setup=analysis.get("trade_setup"),
+                bullish_scenarios=analysis.get("bullish_scenarios"),
+                bearish_scenarios=analysis.get("bearish_scenarios"),
+                invalidation_conditions=analysis.get("invalidation_conditions"),
+                confidence_score=analysis.get("confidence_score", 0),
+                reasoning=analysis.get("reasoning"),
+                status="active"
+            )
+            db.add(chart_record)
+            db.commit()
+            db.refresh(chart_record)
+            analysis_id = chart_record.id
+        except Exception as e:
+            logger.error(f"Failed to save chart analysis: {e}")
+            analysis_id = None
+        
     except Exception as e:
         logger.error(f"Chart analysis failed: {e}")
         raise HTTPException(status_code=500, detail="AI analysis failed. Please try again.")
@@ -92,6 +119,7 @@ async def analyze_chart(
             pass
     
     return {
+        "analysis_id": analysis_id,
         "asset": asset.upper(),
         "timeframe": timeframe,
         "analyzed_at": datetime.now(timezone.utc).isoformat(),
@@ -104,11 +132,54 @@ async def analyze_chart(
 @router.get("/history")
 async def get_analysis_history(
     user = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    limit: int = Query(20, le=100)
+):
+    """Get user's chart analysis history"""
+    analyses = db.query(ChartAnalysis).filter(
+        ChartAnalysis.user_id == user.id
+    ).order_by(ChartAnalysis.created_at.desc()).limit(limit).all()
+    
+    return {
+        "count": len(analyses),
+        "analyses": [_format_analysis(a) for a in analyses]
+    }
+
+
+@router.get("/{analysis_id}")
+async def get_analysis(
+    analysis_id: int,
+    user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get user's chart analysis history (placeholder)"""
-    # Future: Store analyses in database
+    """Get a specific chart analysis"""
+    analysis = db.query(ChartAnalysis).filter(
+        ChartAnalysis.id == analysis_id,
+        ChartAnalysis.user_id == user.id
+    ).first()
+    
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    
+    return _format_analysis(analysis)
+
+
+def _format_analysis(a: ChartAnalysis) -> dict:
+    """Format analysis for API response"""
     return {
-        "message": "Chart analysis history coming soon",
-        "analyses": []
+        "id": a.id,
+        "asset": a.asset,
+        "timeframe": a.timeframe,
+        "pattern_detected": a.pattern_detected,
+        "market_structure": a.market_structure,
+        "key_levels": a.key_levels or {"support": [], "resistance": []},
+        "trade_recommendation": a.trade_recommendation,
+        "trade_setup": a.trade_setup,
+        "bullish_scenarios": a.bullish_scenarios or [],
+        "bearish_scenarios": a.bearish_scenarios or [],
+        "invalidation_conditions": a.invalidation_conditions or [],
+        "confidence_score": a.confidence_score,
+        "reasoning": a.reasoning,
+        "status": a.status,
+        "created_at": a.created_at.isoformat() if a.created_at else None
     }
