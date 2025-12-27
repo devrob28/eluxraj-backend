@@ -1,7 +1,7 @@
 """API Usage Tracking Model"""
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index
 from sqlalchemy.sql import func
-from app.db.session import Base
+from app.db.base import Base
 
 class APIUsage(Base):
     """Track API usage per user per feature per day"""
