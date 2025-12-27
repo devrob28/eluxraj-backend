@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, UserUpdate
@@ -200,3 +200,96 @@ async def update_phone(req: UpdatePhoneRequest, user=Depends(get_current_user), 
 async def get_phone(user=Depends(get_current_user)):
     """Get user phone number"""
     return {"ok": True, "phone": getattr(user, 'phone', None)}
+
+
+# Password Reset Models
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+@router.post("/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Send password reset email"""
+    import secrets
+    import os
+    from sendgrid import SendGridAPIClient
+    from sendgrid.helpers.mail import Mail
+    
+    email = request.email.lower()
+    user = db.query(User).filter(User.email == email).first()
+    
+    # Always return success to prevent email enumeration
+    if not user:
+        logger.info(f"Password reset requested for non-existent email: {email}")
+        return {"message": "If an account exists with this email, a reset link has been sent."}
+    
+    # Generate reset token (valid for 1 hour)
+    reset_token = secrets.token_urlsafe(32)
+    
+    # Store token in user record (we'll add this field)
+    user.reset_token = reset_token
+    user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+    db.commit()
+    
+    # Send email
+    reset_url = f"https://eluxraj.ai/reset-password.html?token={reset_token}"
+    
+    try:
+        sg_api_key = os.getenv("SENDGRID_API_KEY")
+        if sg_api_key:
+            message = Mail(
+                from_email=os.getenv("FROM_EMAIL", "eluxraj@gmail.com"),
+                to_emails=email,
+                subject="Reset Your ELUXRAJ Password",
+                html_content=f"""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <h2 style="color: #7c3aed;">Reset Your Password</h2>
+                    <p>You requested a password reset for your ELUXRAJ account.</p>
+                    <p>Click the button below to reset your password. This link expires in 1 hour.</p>
+                    <a href="{reset_url}" style="display: inline-block; background: linear-gradient(135deg, #7c3aed, #06b6d4); color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin: 20px 0;">Reset Password</a>
+                    <p style="color: #666; font-size: 14px;">If you didn't request this, you can safely ignore this email.</p>
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                    <p style="color: #999; font-size: 12px;">© 2025 ELUXRAJ™. All rights reserved.</p>
+                </div>
+                """
+            )
+            sg = SendGridAPIClient(sg_api_key)
+            sg.send(message)
+            logger.info(f"Password reset email sent to {email}")
+        else:
+            logger.warning("SendGrid API key not configured")
+    except Exception as e:
+        logger.error(f"Failed to send reset email: {e}")
+    
+    return {"message": "If an account exists with this email, a reset link has been sent."}
+
+
+@router.post("/reset-password")
+async def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Reset password using token"""
+    
+    user = db.query(User).filter(User.reset_token == request.token).first()
+    
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    
+    if user.reset_token_expires and user.reset_token_expires < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new one.")
+    
+    # Validate password
+    if len(request.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    
+    # Update password
+    user.hashed_password = get_password_hash(request.new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.commit()
+    
+    logger.info(f"Password reset successful for user {user.id}")
+    
+    return {"message": "Password reset successful. You can now log in with your new password."}
