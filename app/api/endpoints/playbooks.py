@@ -1,7 +1,7 @@
 """Trade Playbook API - Institutional Grade Decision Intelligence"""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 from pydantic import BaseModel
 
@@ -35,6 +35,20 @@ async def generate_playbook(
     # Check tier access
     if user.subscription_tier not in ["pro", "elite", "admin"]:
         raise HTTPException(status_code=403, detail="Pro or Elite subscription required for Trade Playbooks")
+    
+    # Rate limiting by tier
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    playbooks_today = db.query(TradePlaybook).filter(
+        TradePlaybook.user_id == user.id,
+        TradePlaybook.created_at >= today_start
+    ).count()
+    
+    # Pro: 5/day, Elite/Admin: unlimited
+    if user.subscription_tier == "pro" and playbooks_today >= 5:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Daily limit reached (5/day for Pro). Upgrade to Elite for unlimited playbooks. Resets at midnight UTC."
+        )
     
     # Get current price
     current_price = await _get_current_price(request.asset, request.asset_type)
