@@ -81,3 +81,25 @@ def add_playbook_tables(engine):
             logger.info("Created trade_playbooks table")
         except Exception as e:
             logger.warning(f"trade_playbooks table may exist: {e}")
+
+
+def add_api_usage_table(engine):
+    """Add API usage tracking table"""
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS api_usage (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    feature VARCHAR(50) NOT NULL,
+                    date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    count INTEGER DEFAULT 1
+                );
+                
+                CREATE INDEX IF NOT EXISTS idx_usage_user_feature_date 
+                ON api_usage(user_id, feature, date);
+            """))
+            conn.commit()
+            logger.info("Created api_usage table")
+        except Exception as e:
+            logger.warning(f"api_usage table may exist: {e}")
