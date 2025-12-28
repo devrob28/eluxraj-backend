@@ -17,7 +17,7 @@ router = APIRouter()
 
 class PlaybookRequest(BaseModel):
     asset: str
-    asset_type: str = "crypto"
+    asset_type: str = None  # Auto-detect if not provided
     timeframe: str = "4h"
 
 
@@ -91,6 +91,18 @@ async def generate_playbook(
         tier=user.subscription_tier,
         feature="playbook"
     )
+    
+    # Auto-detect asset type if not provided
+    if not request.asset_type:
+        symbol = request.asset.upper()
+        # Known stock symbols (major ones)
+        stocks = ["AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "META", "NVDA", "TSLA", "AMD", "NFLX", "CRM", "ORCL", "IBM", "INTC", "CSCO", "ADBE", "PYPL", "SQ", "SHOP", "UBER", "ABNB", "COIN", "MSTR", "PLTR", "SNOW", "NET", "CRWD", "ZS", "DDOG", "MDB", "SPY", "QQQ", "DIA", "IWM", "VTI", "VOO", "JPM", "BAC", "WFC", "GS", "MS", "V", "MA", "AXP", "DIS", "NKE", "SBUX", "MCD", "WMT", "TGT", "COST", "HD", "LOW", "PG", "KO", "PEP", "JNJ", "PFE", "UNH", "MRNA", "LLY", "ABBV", "XOM", "CVX", "COP", "BA", "CAT", "DE", "GE", "MMM", "HON"]
+        # If symbol looks like a stock or is in our list
+        if symbol in stocks or (len(symbol) <= 5 and symbol.isalpha() and not symbol.endswith("USD") and not symbol.endswith("USDT")):
+            request.asset_type = "stock"
+        else:
+            request.asset_type = "crypto"
+        logger.info(f"Auto-detected asset type: {request.asset_type} for {symbol}")
     
     # Get current price
     current_price = await _get_current_price(request.asset, request.asset_type)
