@@ -332,6 +332,8 @@ class ApexWhaleIntelService:
             from_name = t.get("from", {}).get("name", "")
             to_name = t.get("to", {}).get("name", "")
             amount = t.get("amount_usd", 0)
+            if amount > 100_000_000:  # Cap at 100M - filter out bad data
+                amount = 0
             
             for ex_name in exchanges:
                 if ex_name in from_name:
