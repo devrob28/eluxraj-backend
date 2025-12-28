@@ -213,7 +213,7 @@ RESPOND WITH VALID JSON ONLY (no markdown, no explanation outside JSON):
             logger.error(f"Failed to read image: {e}")
             return self._fallback_analysis(asset, timeframe)
         
-        prompt = f"""You are a senior technical analyst with 20+ years of chart reading experience. You've analyzed thousands of charts across crypto, stocks, and forex markets.
+        prompt = f"""You are an elite technical analyst and Fibonacci specialist with 20+ years of institutional trading experience. You combine classical chart analysis with advanced Fibonacci techniques used by professional traders.
 
 ═══════════════════════════════════════════════════════════════
 CHART ANALYSIS REQUEST
@@ -221,28 +221,68 @@ CHART ANALYSIS REQUEST
 ASSET: {asset}
 TIMEFRAME: {timeframe}
 
-Analyze this chart image with extreme precision. Study every candle, every level, every pattern.
+Analyze this chart with institutional-grade precision. Apply both classical technical analysis AND Fibonacci analysis.
 
 ═══════════════════════════════════════════════════════════════
-YOUR ANALYSIS PROCESS
+YOUR ANALYSIS FRAMEWORK
 ═══════════════════════════════════════════════════════════════
 
-1. FIRST LOOK - What's the dominant trend visible in the chart?
-2. STRUCTURE - Identify swing highs and lows. Is it making HH/HL or LH/LL?
-3. KEY LEVELS - Find the most obvious support and resistance from the chart
-4. PATTERNS - Look for: triangles, wedges, channels, double tops/bottoms, H&S
-5. CANDLESTICKS - Note any significant candle patterns at key levels
-6. CURRENT POSITION - Where is price relative to key levels right now?
-7. TRADE SETUP - Based on all above, is there a valid setup?
+1. TREND IDENTIFICATION
+   - Determine primary trend direction (HH/HL = uptrend, LH/LL = downtrend)
+   - Identify the most recent significant swing high and swing low
+   - Note any trend line breaks or structure shifts
+
+2. FIBONACCI RETRACEMENT ANALYSIS
+   - Identify the most recent impulse move (swing low to swing high OR swing high to swing low)
+   - Calculate key Fibonacci retracement levels:
+     * 0.236 (23.6%) - Shallow retracement, strong trend
+     * 0.382 (38.2%) - Common retracement in strong trends
+     * 0.500 (50.0%) - Psychological midpoint
+     * 0.618 (61.8%) - Golden ratio, most important level
+     * 0.786 (78.6%) - Deep retracement, last defense
+   - Note which Fib level price is currently at or approaching
+   - Identify confluence zones where Fib levels align with S/R
+
+3. FIBONACCI EXTENSION TARGETS
+   - For profit targets, calculate extensions from the retracement:
+     * 1.272 extension - Conservative target
+     * 1.618 extension - Golden ratio target (most common)
+     * 2.000 extension - Measured move target
+     * 2.618 extension - Extended target
+
+4. PATTERN RECOGNITION
+   - Classical: triangles, wedges, channels, double tops/bottoms, H&S
+   - Harmonic patterns: Gartley, Bat, Butterfly, Crab (if visible)
+   - Note pattern completion percentage
+
+5. KEY LEVEL CONFLUENCE
+   - Where do Fibonacci levels align with horizontal S/R?
+   - Where do Fibonacci levels align with trend lines?
+   - These confluence zones are highest probability areas
+
+6. ENTRY OPTIMIZATION
+   - Best entries occur at Fib levels with confluence
+   - 0.618 retracement + horizontal support = high probability long
+   - 0.618 retracement + horizontal resistance = high probability short
+
+═══════════════════════════════════════════════════════════════
+FIBONACCI TRADING RULES
+═══════════════════════════════════════════════════════════════
+- In UPTREND: Look for longs at 0.382, 0.500, or 0.618 retracements
+- In DOWNTREND: Look for shorts at 0.382, 0.500, or 0.618 retracements  
+- Stop loss goes beyond the 0.786 or recent swing point
+- First target: 0.000 (return to swing high/low)
+- Second target: -0.272 or 1.272 extension
+- Third target: -0.618 or 1.618 extension
+- Risk/Reward should be minimum 2:1
 
 ═══════════════════════════════════════════════════════════════
 CRITICAL RULES
 ═══════════════════════════════════════════════════════════════
-- Read the ACTUAL prices from the chart Y-axis
-- If you cannot clearly see prices, estimate based on visible numbers
-- Only suggest a trade if there's a clear setup with defined risk
-- If the chart is unclear or no setup exists, recommend "wait"
-- Be specific about levels you can see in the chart
+- Read ACTUAL prices from the chart Y-axis
+- Calculate Fibonacci levels based on visible swing points
+- Only recommend trades at Fibonacci levels with confluence
+- If no clear Fib setup exists, recommend "wait"
 - This is decision intelligence, NOT financial advice
 
 ═══════════════════════════════════════════════════════════════
@@ -251,24 +291,49 @@ RESPOND WITH VALID JSON ONLY:
 
 {{
     "chart_quality": "clear|moderate|poor",
+    "trend_direction": "uptrend|downtrend|sideways",
+    "trend_strength": "strong|moderate|weak",
     "pattern_detected": "<specific pattern name or 'No clear pattern'>",
-    "pattern_completion": "<how complete is the pattern: forming|near_completion|completed|failed>",
+    "pattern_completion": "forming|near_completion|completed|failed",
     "market_structure": "trending_up|trending_down|ranging|breakout|breakdown|unclear",
-    "trend_description": "<1-2 sentence description of what you see>",
-    "key_levels": {{
-        "support": [<price1 from chart>, <price2 from chart>],
-        "resistance": [<price1 from chart>, <price2 from chart>],
-        "current_price_area": "<where price is relative to levels>"
+    "trend_description": "<2-3 sentence description of trend and structure>",
+    "swing_points": {{
+        "recent_swing_high": "<price from chart>",
+        "recent_swing_low": "<price from chart>",
+        "current_price": "<approximate current price>"
     }},
-    "candlestick_notes": "<any significant candle patterns at key levels>",
-    "volume_analysis": "<if volume visible, what does it suggest>",
+    "fibonacci_analysis": {{
+        "impulse_direction": "up|down",
+        "impulse_start": "<swing low/high price>",
+        "impulse_end": "<swing high/low price>",
+        "fib_236": "<calculated 23.6% level>",
+        "fib_382": "<calculated 38.2% level>",
+        "fib_500": "<calculated 50% level>",
+        "fib_618": "<calculated 61.8% level - GOLDEN RATIO>",
+        "fib_786": "<calculated 78.6% level>",
+        "current_fib_zone": "<which fib level is price at or near>",
+        "fib_confluence": "<describe any confluence with S/R levels>"
+    }},
+    "fibonacci_extensions": {{
+        "ext_1272": "<1.272 extension price>",
+        "ext_1618": "<1.618 extension price - GOLDEN TARGET>",
+        "ext_2000": "<2.0 extension price>"
+    }},
+    "key_levels": {{
+        "support": ["<price1>", "<price2>"],
+        "resistance": ["<price1>", "<price2>"],
+        "fib_support_confluence": "<fib level that aligns with support>",
+        "fib_resistance_confluence": "<fib level that aligns with resistance>"
+    }},
+    "candlestick_notes": "<significant candle patterns at key levels/fib zones>",
+    "volume_analysis": "<volume behavior if visible>",
     "bullish_scenarios": [
         {{
-            "name": "<scenario based on chart>",
+            "name": "<scenario name>",
             "probability": <20-60>,
-            "trigger": "<what price action triggers this>",
-            "target": "<price or description from chart>",
-            "explanation": "<reasoning based on what you see>"
+            "trigger": "<specific price action at fib level>",
+            "target": "<fib extension or key level>",
+            "explanation": "<reasoning with fib levels>"
         }},
         {{
             "name": "<scenario 2>",
@@ -287,11 +352,11 @@ RESPOND WITH VALID JSON ONLY:
     ],
     "bearish_scenarios": [
         {{
-            "name": "<scenario based on chart>",
+            "name": "<scenario name>",
             "probability": <20-60>,
-            "trigger": "<trigger>",
-            "target": "<target>",
-            "explanation": "<reasoning>"
+            "trigger": "<specific price action>",
+            "target": "<fib extension or key level>",
+            "explanation": "<reasoning with fib levels>"
         }},
         {{
             "name": "<scenario 2>",
@@ -310,20 +375,23 @@ RESPOND WITH VALID JSON ONLY:
     ],
     "trade_recommendation": "long|short|wait|no_trade",
     "trade_setup": {{
-        "entry": "<price or zone based on chart>",
-        "stop_loss": "<price below/above structure>",
-        "take_profit_1": "<first target>",
-        "take_profit_2": "<second target>",
-        "take_profit_3": "<extended target>",
-        "risk_reward": <calculated RR ratio>
+        "bias": "bullish|bearish|neutral",
+        "entry_zone": "<fib level or price zone>",
+        "entry_trigger": "<what confirms entry>",
+        "stop_loss": "<beyond fib 0.786 or structure>",
+        "take_profit_1": "<fib extension 1.272 or key level>",
+        "take_profit_2": "<fib extension 1.618 or key level>",
+        "take_profit_3": "<fib extension 2.0 or extended target>",
+        "risk_reward": "<calculated RR ratio>"
     }},
-    "entry_confirmation": "<what to wait for before entering>",
+    "entry_confirmation": "<what to wait for: candle close, volume, etc>",
     "confidence_score": <40-85>,
+    "fib_quality": "<how clean are the fib levels: excellent|good|moderate|poor>",
     "invalidation_conditions": [
-        "<what would invalidate this analysis>",
+        "<price level that invalidates the setup>",
         "<secondary invalidation>"
     ],
-    "reasoning": "<4-6 sentence comprehensive analysis of what you see in the chart, the setup quality, key decision points, and risks. Reference specific levels visible in the chart.>"
+    "reasoning": "<5-7 sentence comprehensive analysis incorporating Fibonacci levels, confluence zones, pattern recognition, and risk assessment. Be specific about which fib levels matter most and why.>"
 }}"""
 
         return await self._call_ai_with_image(prompt, image_data, media_type)
