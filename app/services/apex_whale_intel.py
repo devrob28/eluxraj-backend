@@ -413,8 +413,8 @@ class ApexWhaleIntelService:
         return f"{address[:6]}...{address[-4:]}"
     
     def _estimate_usd(self, value: float, asset: str) -> float:
-        prices = {"ETH": 3400, "WETH": 3400, "BTC": 94000, "WBTC": 94000, "USDT": 1, "USDC": 1, "DAI": 1}
-        return value * prices.get(asset, 1) if value else 0
+        prices = {"ETH": 3400, "WETH": 3400, "stETH": 3400, "BTC": 94000, "WBTC": 94000, "USDT": 1, "USDC": 1, "DAI": 1, "BUSD": 1, "TUSD": 1, "LINK": 23, "UNI": 14, "AAVE": 340, "MKR": 1500, "CRV": 0.5, "LDO": 2, "RPL": 25, "SNX": 3, "COMP": 90, "SUSHI": 1.5, "YFI": 8000, "BAL": 4, "1INCH": 0.5}
+        return value * prices.get(asset, 0) if value else 0
     
     def _calc_sentiment(self, bullish: int, bearish: int) -> str:
         total = bullish + bearish
