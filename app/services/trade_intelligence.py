@@ -1,6 +1,6 @@
 """
-Trade Intelligence Service
-Generates AI-powered trade playbooks and chart analysis
+Trade Intelligence Service V2
+Institutional-grade AI-powered trade playbooks and chart analysis
 """
 import httpx
 import json
@@ -29,64 +29,164 @@ class TradeIntelligenceService:
     ) -> Dict:
         """Generate a complete trade playbook for an asset"""
         
-        prompt = f"""You are an elite quantitative analyst providing institutional-grade trade intelligence.
+        # Timeframe context
+        tf_context = {
+            "15m": "scalping/intraday - focus on immediate momentum, tight stops, quick targets",
+            "1h": "intraday swing - balance momentum with structure, 4-8 hour hold times",
+            "4h": "swing trading - focus on trend structure, 1-5 day hold times typical",
+            "1d": "position trading - focus on major levels, weekly trends, 1-4 week holds",
+            "1w": "macro positioning - focus on monthly/quarterly trends, multi-week to month holds"
+        }.get(timeframe, "swing trading perspective")
+        
+        prompt = f"""You are a senior quantitative analyst at a top-tier hedge fund with 15+ years experience trading {asset_type} markets. You combine technical analysis, market structure analysis, order flow concepts, and risk management into actionable trade intelligence.
 
+═══════════════════════════════════════════════════════════════
+ANALYSIS REQUEST
+═══════════════════════════════════════════════════════════════
 ASSET: {asset}
-TYPE: {asset_type}
-TIMEFRAME: {timeframe}
+ASSET TYPE: {asset_type}
+TIMEFRAME: {timeframe} ({tf_context})
 CURRENT PRICE: ${current_price:,.2f}
-MARKET DATA: {json.dumps(market_data) if market_data else 'Not provided'}
+ANALYSIS TIME: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}
+{f"SUPPLEMENTAL DATA: {json.dumps(market_data)}" if market_data else ""}
 
-Generate a complete TRADE PLAYBOOK with the following structure. Be precise with numbers.
+═══════════════════════════════════════════════════════════════
+YOUR ANALYSIS FRAMEWORK
+═══════════════════════════════════════════════════════════════
 
-IMPORTANT RULES:
-1. All probabilities must sum appropriately
-2. Include uncertainty - never guarantee outcomes
-3. Provide clear invalidation logic
-4. Risk-reward must be calculated accurately
-5. This is decision intelligence, NOT financial advice
+1. MARKET STRUCTURE ANALYSIS
+   - Identify current trend (HH/HL for uptrend, LH/LL for downtrend)
+   - Locate key swing points and structure breaks
+   - Determine if price is in markup, markdown, accumulation, or distribution
 
-Respond ONLY with valid JSON in this exact format:
+2. KEY LEVEL IDENTIFICATION  
+   - Major support/resistance from recent price action
+   - Round psychological numbers
+   - Previous day/week/month highs and lows
+   - Areas of high volume/liquidity
+
+3. PATTERN RECOGNITION
+   - Classic patterns: triangles, wedges, channels, head & shoulders
+   - Candlestick patterns: engulfing, doji, hammers at key levels
+   - Momentum divergences if applicable
+
+4. TRADE SETUP CONSTRUCTION
+   - Entry zone: Where institutional buyers/sellers likely step in
+   - Stop loss: Beyond structure that invalidates the thesis
+   - Targets: Scaled exits at logical resistance/support levels
+   - Risk/Reward: Minimum 2:1 for valid setups
+
+5. SCENARIO PLANNING
+   - Map out 3 bullish and 3 bearish scenarios with specific triggers
+   - Assign realistic probabilities that reflect uncertainty
+   - Include invalidation conditions for each scenario
+
+═══════════════════════════════════════════════════════════════
+CRITICAL RULES
+═══════════════════════════════════════════════════════════════
+- PRICES MUST BE REALISTIC relative to current price ${current_price:,.2f}
+- Entry zones should be within 5% of current price for {timeframe} timeframe
+- Stop losses should be 2-8% from entry depending on timeframe
+- Take profits should be at logical levels (prior highs/lows, fib extensions, round numbers)
+- Risk/Reward must be calculated as: (TP1 - Entry) / (Entry - StopLoss)
+- Probabilities should reflect genuine uncertainty - avoid 90%+ confidence
+- This is DECISION INTELLIGENCE, not financial advice
+
+═══════════════════════════════════════════════════════════════
+RESPOND WITH VALID JSON ONLY (no markdown, no explanation outside JSON):
+═══════════════════════════════════════════════════════════════
+
 {{
     "market_bias": "bullish|bearish|neutral",
-    "bias_strength": <0-100>,
+    "bias_strength": <50-85 realistic range>,
+    "market_structure": "trending_up|trending_down|ranging|breakout|breakdown|accumulation|distribution",
+    "trend_analysis": "<2-3 sentence description of current trend and key levels>",
     "entry_zone": {{
-        "low": <price>,
-        "high": <price>,
-        "rationale": "<why this zone>"
+        "low": <price within 3% below current>,
+        "high": <price within 2% above current>,
+        "rationale": "<specific technical reason for this zone>"
     }},
     "stop_loss": {{
-        "price": <price>,
-        "percentage": <% from entry>,
-        "rationale": "<why here>"
+        "price": <price below entry zone>,
+        "percentage": <2-8% from mid entry>,
+        "rationale": "<what structure this is below/above>"
     }},
     "take_profits": [
-        {{"level": "TP1", "price": <price>, "probability": <0-100>, "rationale": "<reason>"}},
-        {{"level": "TP2", "price": <price>, "probability": <0-100>, "rationale": "<reason>"}},
-        {{"level": "TP3", "price": <price>, "probability": <0-100>, "rationale": "<reason>"}}
+        {{"level": "TP1", "price": <conservative target>, "probability": <50-70>, "rationale": "<nearest resistance/support>"}},
+        {{"level": "TP2", "price": <moderate target>, "probability": <30-50>, "rationale": "<next major level>"}},
+        {{"level": "TP3", "price": <aggressive target>, "probability": <15-35>, "rationale": "<extended target>"}}
     ],
-    "risk_reward_ratio": <number>,
-    "probability_score": <0-100>,
-    "confidence_score": <0-100>,
+    "position_sizing": {{
+        "suggested_risk": "1-2% of portfolio",
+        "scaling_strategy": "Enter 50% at zone low, 50% at zone high OR scale in on confirmation"
+    }},
+    "risk_reward_ratio": <calculated RR to TP1, minimum 2.0>,
+    "probability_score": <40-75 realistic range>,
+    "confidence_score": <50-80 realistic range>,
+    "pattern_detected": "<specific pattern or 'No clear pattern - structure-based setup'>",
+    "key_levels": {{
+        "major_resistance": [<price1>, <price2>],
+        "major_support": [<price1>, <price2>],
+        "pivot_point": <key decision level>
+    }},
     "bullish_scenarios": [
-        {{"name": "<scenario name>", "probability": <0-100>, "trigger": "<what causes this>", "target": <price>, "explanation": "<detailed reasoning>"}},
-        {{"name": "<scenario name>", "probability": <0-100>, "trigger": "<what causes this>", "target": <price>, "explanation": "<detailed reasoning>"}},
-        {{"name": "<scenario name>", "probability": <0-100>, "trigger": "<what causes this>", "target": <price>, "explanation": "<detailed reasoning>"}}
+        {{
+            "name": "<specific scenario name>",
+            "probability": <20-50>,
+            "trigger": "<exact price action or event that triggers this>",
+            "target": <price target>,
+            "explanation": "<detailed 2-3 sentence reasoning with specific levels>"
+        }},
+        {{
+            "name": "<scenario 2>",
+            "probability": <15-40>,
+            "trigger": "<trigger>",
+            "target": <target>,
+            "explanation": "<reasoning>"
+        }},
+        {{
+            "name": "<scenario 3>",
+            "probability": <10-30>,
+            "trigger": "<trigger>",
+            "target": <target>,
+            "explanation": "<reasoning>"
+        }}
     ],
     "bearish_scenarios": [
-        {{"name": "<scenario name>", "probability": <0-100>, "trigger": "<what causes this>", "target": <price>, "explanation": "<detailed reasoning>"}},
-        {{"name": "<scenario name>", "probability": <0-100>, "trigger": "<what causes this>", "target": <price>, "explanation": "<detailed reasoning>"}},
-        {{"name": "<scenario name>", "probability": <0-100>, "trigger": "<what causes this>", "target": <price>, "explanation": "<detailed reasoning>"}}
+        {{
+            "name": "<specific scenario name>",
+            "probability": <20-50>,
+            "trigger": "<exact price action or event>",
+            "target": <downside target>,
+            "explanation": "<detailed reasoning>"
+        }},
+        {{
+            "name": "<scenario 2>",
+            "probability": <15-40>,
+            "trigger": "<trigger>",
+            "target": <target>,
+            "explanation": "<reasoning>"
+        }},
+        {{
+            "name": "<scenario 3>",
+            "probability": <10-30>,
+            "trigger": "<trigger>",
+            "target": <target>,
+            "explanation": "<reasoning>"
+        }}
     ],
     "invalidation_conditions": [
-        "<condition 1>",
-        "<condition 2>",
-        "<condition 3>"
+        "<specific price level or condition that invalidates bullish thesis>",
+        "<secondary invalidation>",
+        "<time-based invalidation if applicable>"
     ],
-    "invalidation_price": <price where thesis is invalid>,
-    "pattern_detected": "<technical pattern if any>",
-    "market_structure": "trending_up|trending_down|ranging|breakout|breakdown",
-    "reasoning": "<comprehensive analysis reasoning>"
+    "invalidation_price": <price where entire thesis fails>,
+    "trade_management": {{
+        "entry_confirmation": "<what to look for before entering>",
+        "move_stop_to_breakeven": "<condition to move stop>",
+        "partial_profit_taking": "Take 33% at TP1, 33% at TP2, let 34% run to TP3"
+    }},
+    "reasoning": "<comprehensive 4-6 sentence analysis explaining the setup, why levels matter, what you're watching for, and key risks. Be specific about price levels and market structure.>"
 }}"""
 
         return await self._call_ai(prompt)
@@ -113,50 +213,117 @@ Respond ONLY with valid JSON in this exact format:
             logger.error(f"Failed to read image: {e}")
             return self._fallback_analysis(asset, timeframe)
         
-        prompt = f"""You are an elite technical analyst with 20+ years of experience. Analyze this chart image.
+        prompt = f"""You are a senior technical analyst with 20+ years of chart reading experience. You've analyzed thousands of charts across crypto, stocks, and forex markets.
 
+═══════════════════════════════════════════════════════════════
+CHART ANALYSIS REQUEST
+═══════════════════════════════════════════════════════════════
 ASSET: {asset}
 TIMEFRAME: {timeframe}
 
-Provide institutional-grade analysis. Be specific with price levels visible in the chart.
+Analyze this chart image with extreme precision. Study every candle, every level, every pattern.
 
-IMPORTANT RULES:
-1. If the chart is unclear or you cannot identify patterns, say "no_trade" 
-2. Include uncertainty in all probability assessments
-3. Never guarantee outcomes
-4. Provide clear invalidation logic
-5. This is decision intelligence, NOT financial advice
+═══════════════════════════════════════════════════════════════
+YOUR ANALYSIS PROCESS
+═══════════════════════════════════════════════════════════════
 
-Respond ONLY with valid JSON:
+1. FIRST LOOK - What's the dominant trend visible in the chart?
+2. STRUCTURE - Identify swing highs and lows. Is it making HH/HL or LH/LL?
+3. KEY LEVELS - Find the most obvious support and resistance from the chart
+4. PATTERNS - Look for: triangles, wedges, channels, double tops/bottoms, H&S
+5. CANDLESTICKS - Note any significant candle patterns at key levels
+6. CURRENT POSITION - Where is price relative to key levels right now?
+7. TRADE SETUP - Based on all above, is there a valid setup?
+
+═══════════════════════════════════════════════════════════════
+CRITICAL RULES
+═══════════════════════════════════════════════════════════════
+- Read the ACTUAL prices from the chart Y-axis
+- If you cannot clearly see prices, estimate based on visible numbers
+- Only suggest a trade if there's a clear setup with defined risk
+- If the chart is unclear or no setup exists, recommend "wait"
+- Be specific about levels you can see in the chart
+- This is decision intelligence, NOT financial advice
+
+═══════════════════════════════════════════════════════════════
+RESPOND WITH VALID JSON ONLY:
+═══════════════════════════════════════════════════════════════
+
 {{
-    "pattern_detected": "<pattern name or 'none'>",
+    "chart_quality": "clear|moderate|poor",
+    "pattern_detected": "<specific pattern name or 'No clear pattern'>",
+    "pattern_completion": "<how complete is the pattern: forming|near_completion|completed|failed>",
     "market_structure": "trending_up|trending_down|ranging|breakout|breakdown|unclear",
+    "trend_description": "<1-2 sentence description of what you see>",
     "key_levels": {{
-        "support": [<price1>, <price2>],
-        "resistance": [<price1>, <price2>]
+        "support": [<price1 from chart>, <price2 from chart>],
+        "resistance": [<price1 from chart>, <price2 from chart>],
+        "current_price_area": "<where price is relative to levels>"
     }},
+    "candlestick_notes": "<any significant candle patterns at key levels>",
+    "volume_analysis": "<if volume visible, what does it suggest>",
     "bullish_scenarios": [
-        {{"name": "<scenario>", "probability": <0-100>, "trigger": "<condition>", "target": "<price or description>", "explanation": "<reasoning>"}},
-        {{"name": "<scenario>", "probability": <0-100>, "trigger": "<condition>", "target": "<price or description>", "explanation": "<reasoning>"}},
-        {{"name": "<scenario>", "probability": <0-100>, "trigger": "<condition>", "target": "<price or description>", "explanation": "<reasoning>"}}
+        {{
+            "name": "<scenario based on chart>",
+            "probability": <20-60>,
+            "trigger": "<what price action triggers this>",
+            "target": "<price or description from chart>",
+            "explanation": "<reasoning based on what you see>"
+        }},
+        {{
+            "name": "<scenario 2>",
+            "probability": <15-45>,
+            "trigger": "<trigger>",
+            "target": "<target>",
+            "explanation": "<reasoning>"
+        }},
+        {{
+            "name": "<scenario 3>",
+            "probability": <10-35>,
+            "trigger": "<trigger>",
+            "target": "<target>",
+            "explanation": "<reasoning>"
+        }}
     ],
     "bearish_scenarios": [
-        {{"name": "<scenario>", "probability": <0-100>, "trigger": "<condition>", "target": "<price or description>", "explanation": "<reasoning>"}},
-        {{"name": "<scenario>", "probability": <0-100>, "trigger": "<condition>", "target": "<price or description>", "explanation": "<reasoning>"}},
-        {{"name": "<scenario>", "probability": <0-100>, "trigger": "<condition>", "target": "<price or description>", "explanation": "<reasoning>"}}
+        {{
+            "name": "<scenario based on chart>",
+            "probability": <20-60>,
+            "trigger": "<trigger>",
+            "target": "<target>",
+            "explanation": "<reasoning>"
+        }},
+        {{
+            "name": "<scenario 2>",
+            "probability": <15-45>,
+            "trigger": "<trigger>",
+            "target": "<target>",
+            "explanation": "<reasoning>"
+        }},
+        {{
+            "name": "<scenario 3>",
+            "probability": <10-35>,
+            "trigger": "<trigger>",
+            "target": "<target>",
+            "explanation": "<reasoning>"
+        }}
     ],
-    "trade_recommendation": "long|short|no_trade|wait",
+    "trade_recommendation": "long|short|wait|no_trade",
     "trade_setup": {{
-        "entry": "<price or zone>",
-        "stop_loss": "<price>",
-        "take_profit_1": "<price>",
-        "take_profit_2": "<price>",
-        "take_profit_3": "<price>",
-        "risk_reward": <ratio>
+        "entry": "<price or zone based on chart>",
+        "stop_loss": "<price below/above structure>",
+        "take_profit_1": "<first target>",
+        "take_profit_2": "<second target>",
+        "take_profit_3": "<extended target>",
+        "risk_reward": <calculated RR ratio>
     }},
-    "confidence_score": <0-100>,
-    "invalidation_conditions": ["<condition1>", "<condition2>"],
-    "reasoning": "<comprehensive analysis>"
+    "entry_confirmation": "<what to wait for before entering>",
+    "confidence_score": <40-85>,
+    "invalidation_conditions": [
+        "<what would invalidate this analysis>",
+        "<secondary invalidation>"
+    ],
+    "reasoning": "<4-6 sentence comprehensive analysis of what you see in the chart, the setup quality, key decision points, and risks. Reference specific levels visible in the chart.>"
 }}"""
 
         return await self._call_ai_with_image(prompt, image_data, media_type)
@@ -177,17 +344,16 @@ Respond ONLY with valid JSON:
                         "content-type": "application/json"
                     },
                     json={
-                        "model": "claude-3-haiku-20240307",
+                        "model": "claude-3-5-sonnet-20241022",
                         "max_tokens": 4096,
                         "messages": [{"role": "user", "content": prompt}]
                     },
-                    timeout=60.0
+                    timeout=90.0
                 )
                 
                 if response.status_code == 200:
                     data = response.json()
                     content = data["content"][0]["text"]
-                    # Extract JSON from response
                     return self._parse_json_response(content)
                 else:
                     logger.error(f"Anthropic API error: {response.status_code} - {response.text}")
@@ -212,7 +378,7 @@ Respond ONLY with valid JSON:
                         "content-type": "application/json"
                     },
                     json={
-                        "model": "claude-3-haiku-20240307",
+                        "model": "claude-3-5-sonnet-20241022",
                         "max_tokens": 4096,
                         "messages": [{
                             "role": "user",
@@ -229,7 +395,7 @@ Respond ONLY with valid JSON:
                             ]
                         }]
                     },
-                    timeout=90.0
+                    timeout=120.0
                 )
                 
                 if response.status_code == 200:
@@ -264,7 +430,7 @@ Respond ONLY with valid JSON:
                     return json.loads(match.group(0))
                 except:
                     pass
-        logger.error(f"Failed to parse AI response: {content[:200]}")
+        logger.error(f"Failed to parse AI response: {content[:500]}")
         return self._fallback_playbook()
     
     def _fallback_playbook(self) -> Dict:
@@ -272,7 +438,7 @@ Respond ONLY with valid JSON:
         return {
             "market_bias": "neutral",
             "bias_strength": 50,
-            "entry_zone": {"low": 0, "high": 0, "rationale": "Analysis unavailable"},
+            "entry_zone": {"low": 0, "high": 0, "rationale": "AI analysis temporarily unavailable - please try again"},
             "stop_loss": {"price": 0, "percentage": 5, "rationale": "Default 5%"},
             "take_profits": [
                 {"level": "TP1", "price": 0, "probability": 33, "rationale": "Pending"},
@@ -282,31 +448,40 @@ Respond ONLY with valid JSON:
             "risk_reward_ratio": 0,
             "probability_score": 50,
             "confidence_score": 0,
-            "bullish_scenarios": [{"name": "Pending Analysis", "probability": 33, "trigger": "N/A", "target": 0, "explanation": "AI analysis unavailable"}],
-            "bearish_scenarios": [{"name": "Pending Analysis", "probability": 33, "trigger": "N/A", "target": 0, "explanation": "AI analysis unavailable"}],
-            "invalidation_conditions": ["Analysis unavailable"],
+            "bullish_scenarios": [{"name": "Analysis Pending", "probability": 33, "trigger": "N/A", "target": 0, "explanation": "AI analysis temporarily unavailable. Please try again in a moment."}],
+            "bearish_scenarios": [{"name": "Analysis Pending", "probability": 33, "trigger": "N/A", "target": 0, "explanation": "AI analysis temporarily unavailable. Please try again in a moment."}],
+            "invalidation_conditions": ["Analysis unavailable - please retry"],
             "invalidation_price": 0,
-            "pattern_detected": "none",
+            "pattern_detected": "Pending",
             "market_structure": "unclear",
-            "reasoning": "AI analysis temporarily unavailable. Please try again.",
+            "reasoning": "AI analysis temporarily unavailable. This could be due to high demand or a temporary service issue. Please try again in a few moments.",
             "error": True
         }
     
     def _fallback_analysis(self, asset: str, timeframe: str) -> Dict:
         """Return fallback for chart analysis"""
         return {
-            "pattern_detected": "none",
+            "chart_quality": "unknown",
+            "pattern_detected": "Analysis pending",
             "market_structure": "unclear",
             "key_levels": {"support": [], "resistance": []},
-            "bullish_scenarios": [{"name": "Analysis Pending", "probability": 33, "trigger": "N/A", "target": "N/A", "explanation": "Unable to process chart"}],
-            "bearish_scenarios": [{"name": "Analysis Pending", "probability": 33, "trigger": "N/A", "target": "N/A", "explanation": "Unable to process chart"}],
-            "trade_recommendation": "no_trade",
-            "trade_setup": None,
+            "bullish_scenarios": [{"name": "Analysis Pending", "probability": 33, "trigger": "N/A", "target": "N/A", "explanation": "AI analysis temporarily unavailable"}],
+            "bearish_scenarios": [{"name": "Analysis Pending", "probability": 33, "trigger": "N/A", "target": "N/A", "explanation": "AI analysis temporarily unavailable"}],
+            "trade_recommendation": "wait",
+            "trade_setup": {
+                "entry": "N/A",
+                "stop_loss": "N/A",
+                "take_profit_1": "N/A",
+                "take_profit_2": "N/A",
+                "take_profit_3": "N/A",
+                "risk_reward": 0
+            },
             "confidence_score": 0,
             "invalidation_conditions": ["Analysis unavailable"],
-            "reasoning": "Chart analysis temporarily unavailable.",
+            "reasoning": "AI analysis temporarily unavailable. Please try again.",
             "error": True
         }
 
 
+# Singleton instance
 trade_intelligence = TradeIntelligenceService()
