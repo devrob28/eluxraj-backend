@@ -344,7 +344,7 @@ RESPOND WITH VALID JSON ONLY:
                         "content-type": "application/json"
                     },
                     json={
-                        "model": "claude-3-5-sonnet-20241022",
+                        "model": "claude-3-haiku-20240307",
                         "max_tokens": 4096,
                         "messages": [{"role": "user", "content": prompt}]
                     },
@@ -378,7 +378,7 @@ RESPOND WITH VALID JSON ONLY:
                         "content-type": "application/json"
                     },
                     json={
-                        "model": "claude-3-5-sonnet-20241022",
+                        "model": "claude-3-haiku-20240307",
                         "max_tokens": 4096,
                         "messages": [{
                             "role": "user",
