@@ -187,6 +187,26 @@ async def get_playbook(
 
 
 async def _get_current_price(asset: str, asset_type: str) -> float:
+    """Fetch current price from CoinGecko (crypto) or Yahoo Finance (stocks)"""
+    import httpx
+    
+    if asset_type == "stock":
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                # Use Yahoo Finance API
+                r = await client.get(
+                    f"https://query1.finance.yahoo.com/v8/finance/chart/{asset}",
+                    headers={"User-Agent": "Mozilla/5.0"}
+                )
+                if r.status_code == 200:
+                    data = r.json()
+                    price = data.get("chart", {}).get("result", [{}])[0].get("meta", {}).get("regularMarketPrice", 0)
+                    if price:
+                        return float(price)
+        except Exception as e:
+            pass
+        return 0
+    
     """Fetch current price from CoinGecko or FMP"""
     import httpx
     
