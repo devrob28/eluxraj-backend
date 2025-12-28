@@ -16,7 +16,7 @@ router = APIRouter(prefix="", tags=["Whale Intel"])
 async def get_unified_whale_feed(
     limit: int = Query(default=50, le=100),
     asset_type: Optional[str] = Query(default=None, description="crypto or stock"),
-    current_user: User = Depends(get_current_user)
+    
 ):
     """Get unified whale feed - crypto whales + stock insiders"""
     try:
@@ -47,7 +47,7 @@ async def get_whale_transfers(limit: int = Query(default=20, le=50)):
 @router.get("/crypto")
 async def get_crypto_whale_activity(
     limit: int = Query(default=25, le=50),
-    current_user: User = Depends(get_current_user)
+    
 ):
     """Get crypto whale activity from exchanges and market makers"""
     try:
@@ -61,7 +61,7 @@ async def get_crypto_whale_activity(
 async def get_stock_insider_activity(
     limit: int = Query(default=25, le=50),
     ticker: Optional[str] = Query(default=None, description="Filter by stock ticker"),
-    current_user: User = Depends(get_current_user)
+    
 ):
     """Get stock insider trading from SEC Form 4 filings"""
     try:
@@ -74,7 +74,7 @@ async def get_stock_insider_activity(
 @router.get("/insider-buys")
 async def get_top_insider_buys(
     days: int = Query(default=7, le=30),
-    current_user: User = Depends(get_current_user)
+    
 ):
     """Get top insider buys - bullish signal when executives buy their own stock"""
     try:
@@ -95,7 +95,7 @@ async def get_exchange_flows():
 
 
 @router.get("/insights")
-async def get_whale_insights(current_user: User = Depends(get_current_user)):
+async def get_whale_insights():
     """Get actionable whale insights combining crypto and stocks"""
     try:
         insights = await apex_whale_intel.get_whale_insights()
