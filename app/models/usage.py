@@ -21,11 +21,11 @@ class APIUsage(Base):
 # ═══════════════════════════════════════════════════════════════
 # RATE LIMITS BY TIER
 # ═══════════════════════════════════════════════════════════════
-# Pricing: Pro = $99/mo, Elite = $800/mo
+# Pricing: Pro = $53/mo, Elite = $98/mo
 # 
-# LITE (Free):     Basic dashboard only, no AI features
-# PRO ($99/mo):    Limited AI access, good for casual traders
-# ELITE ($800/mo): Unlimited everything, institutional-grade
+# LITE ($35/mo):     Basic dashboard only, no AI features
+# PRO ($53/mo):    Limited AI access, good for casual traders
+# ELITE ($98/mo): Unlimited everything, institutional-grade
 # ═══════════════════════════════════════════════════════════════
 
 RATE_LIMITS = {
@@ -53,13 +53,6 @@ RATE_LIMITS = {
         "admin": 9999,
     },
     
-    # Oracle Predictions - AI market predictions
-    "oracle": {
-        "lite": 0,       # No access
-        "pro": 3,        # 3 per day
-        "elite": 9999,   # Unlimited
-        "admin": 9999,
-    },
     
     # Weekly AI Brief - Comprehensive market analysis
     "weekly_brief": {
@@ -77,13 +70,6 @@ RATE_LIMITS = {
         "admin": 9999,
     },
     
-    # Paper Trading - Practice trades
-    "paper_trade": {
-        "lite": 5,       # 5 trades per day
-        "pro": 50,       # 50 per day
-        "elite": 9999,   # Unlimited
-        "admin": 9999,
-    },
 }
 
 
@@ -92,16 +78,14 @@ FEATURE_DESCRIPTIONS = {
     "playbook": "AI Trade Playbooks with complete entry/exit strategies",
     "chart_analysis": "AI Chart Pattern Analysis with Fibonacci levels",
     "whale_intel": "Real-time Whale & Insider Trading Intelligence",
-    "oracle": "AI Market Predictions & Signals",
     "weekly_brief": "Weekly AI Market Analysis Brief",
     "alerts": "Custom Price & Whale Alerts",
-    "paper_trade": "Paper Trading Simulator",
 }
 
 
 # Tier pricing for upgrade prompts
 TIER_PRICING = {
-    "lite": "$0/mo",
-    "pro": "$99/mo",
-    "elite": "$800/mo",
+    "lite": "$35/mo",
+    "pro": "$53/mo",
+    "elite": "$98/mo",
 }
