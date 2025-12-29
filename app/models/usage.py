@@ -9,28 +9,99 @@ class APIUsage(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    feature = Column(String(50), nullable=False)  # 'playbook', 'chart_analysis', etc.
+    feature = Column(String(50), nullable=False)
     date = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     count = Column(Integer, default=1, nullable=False)
     
-    # Composite index for efficient lookups
     __table_args__ = (
         Index('idx_usage_user_feature_date', 'user_id', 'feature', 'date'),
     )
 
 
-# Rate limits by tier and feature
+# ═══════════════════════════════════════════════════════════════
+# RATE LIMITS BY TIER
+# ═══════════════════════════════════════════════════════════════
+# Pricing: Pro = $99/mo, Elite = $800/mo
+# 
+# LITE (Free):     Basic dashboard only, no AI features
+# PRO ($99/mo):    Limited AI access, good for casual traders
+# ELITE ($800/mo): Unlimited everything, institutional-grade
+# ═══════════════════════════════════════════════════════════════
+
 RATE_LIMITS = {
+    # AI Trade Playbooks - Complete trade setups with entry/exit/stops
     "playbook": {
-        "lite": 0,      # No access
-        "pro": 5,       # 5 per day
-        "elite": 999,   # Unlimited (high number)
-        "admin": 999,   # Unlimited
+        "lite": 0,       # No access
+        "pro": 5,        # 5 per day
+        "elite": 9999,   # Unlimited
+        "admin": 9999,
     },
+    
+    # Chart AI Analysis - Upload chart images for AI analysis
     "chart_analysis": {
-        "lite": 0,      # No access
-        "pro": 10,      # 10 per day
-        "elite": 999,   # Unlimited
-        "admin": 999,   # Unlimited
-    }
+        "lite": 0,       # No access
+        "pro": 10,       # 10 per day
+        "elite": 9999,   # Unlimited
+        "admin": 9999,
+    },
+    
+    # Whale Intel - Track smart money movements
+    "whale_intel": {
+        "lite": 3,       # 3 views per day (teaser)
+        "pro": 50,       # 50 per day
+        "elite": 9999,   # Unlimited
+        "admin": 9999,
+    },
+    
+    # Oracle Predictions - AI market predictions
+    "oracle": {
+        "lite": 0,       # No access
+        "pro": 3,        # 3 per day
+        "elite": 9999,   # Unlimited
+        "admin": 9999,
+    },
+    
+    # Weekly AI Brief - Comprehensive market analysis
+    "weekly_brief": {
+        "lite": 0,       # No access
+        "pro": 1,        # 1 per week (it's weekly anyway)
+        "elite": 9999,   # Unlimited
+        "admin": 9999,
+    },
+    
+    # Custom Alerts - Price/whale/insider alerts
+    "alerts": {
+        "lite": 1,       # 1 alert
+        "pro": 10,       # 10 alerts
+        "elite": 100,    # 100 alerts
+        "admin": 9999,
+    },
+    
+    # Paper Trading - Practice trades
+    "paper_trade": {
+        "lite": 5,       # 5 trades per day
+        "pro": 50,       # 50 per day
+        "elite": 9999,   # Unlimited
+        "admin": 9999,
+    },
+}
+
+
+# Feature descriptions for upgrade prompts
+FEATURE_DESCRIPTIONS = {
+    "playbook": "AI Trade Playbooks with complete entry/exit strategies",
+    "chart_analysis": "AI Chart Pattern Analysis with Fibonacci levels",
+    "whale_intel": "Real-time Whale & Insider Trading Intelligence",
+    "oracle": "AI Market Predictions & Signals",
+    "weekly_brief": "Weekly AI Market Analysis Brief",
+    "alerts": "Custom Price & Whale Alerts",
+    "paper_trade": "Paper Trading Simulator",
+}
+
+
+# Tier pricing for upgrade prompts
+TIER_PRICING = {
+    "lite": "$0/mo",
+    "pro": "$99/mo",
+    "elite": "$800/mo",
 }

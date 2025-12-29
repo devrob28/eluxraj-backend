@@ -1,12 +1,16 @@
 """
 APEX Whale Intel API Endpoints
 Institutional-grade whale tracking for Crypto AND Stocks
+Rate limited by tier: Lite (3/day), Pro (50/day), Elite (unlimited)
 """
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Query, Depends, HTTPException
 from typing import Optional
 from app.services.apex_whale_intel import apex_whale_intel
 from app.services.alchemy_whale_service import alchemy_whale_service
 from app.core.deps import get_current_user
+from app.services.rate_limiter import rate_limiter
+from app.db.session import get_db
+from sqlalchemy.orm import Session
 from app.models.user import User
 
 router = APIRouter(prefix="", tags=["Whale Intel"])
@@ -16,9 +20,18 @@ router = APIRouter(prefix="", tags=["Whale Intel"])
 async def get_unified_whale_feed(
     limit: int = Query(default=50, le=100),
     asset_type: Optional[str] = Query(default=None, description="crypto or stock"),
-    
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """Get unified whale feed - crypto whales + stock insiders"""
+    # Rate limit check
+    usage = rate_limiter.check_and_increment(
+        db=db,
+        user_id=current_user.id,
+        tier=current_user.subscription_tier,
+        feature="whale_intel"
+    )
+    
     try:
         feed = await apex_whale_intel.get_unified_whale_feed(limit=limit)
         
@@ -29,6 +42,7 @@ async def get_unified_whale_feed(
             ]
             feed["summary"]["filtered_by"] = asset_type
         
+        feed["usage"] = usage
         return feed
     except Exception as e:
         return {"ok": False, "error": str(e), "transactions": []}
@@ -36,7 +50,7 @@ async def get_unified_whale_feed(
 
 @router.get("/transfers")
 async def get_whale_transfers(limit: int = Query(default=20, le=50)):
-    """Get crypto whale transfers (legacy endpoint)"""
+    """Get crypto whale transfers (legacy endpoint - no auth)"""
     try:
         transfers = await alchemy_whale_service.get_whale_transfers(limit=limit)
         return {"ok": True, "transfers": transfers, "count": len(transfers), "source": "alchemy"}
@@ -47,12 +61,20 @@ async def get_whale_transfers(limit: int = Query(default=20, le=50)):
 @router.get("/crypto")
 async def get_crypto_whale_activity(
     limit: int = Query(default=25, le=50),
-    
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """Get crypto whale activity from exchanges and market makers"""
+    usage = rate_limiter.check_and_increment(
+        db=db,
+        user_id=current_user.id,
+        tier=current_user.subscription_tier,
+        feature="whale_intel"
+    )
+    
     try:
         activity = await apex_whale_intel.get_crypto_whale_activity(limit=limit)
-        return {"ok": True, "transactions": activity, "count": len(activity), "asset_type": "crypto"}
+        return {"ok": True, "transactions": activity, "count": len(activity), "asset_type": "crypto", "usage": usage}
     except Exception as e:
         return {"ok": False, "error": str(e), "transactions": []}
 
@@ -61,12 +83,20 @@ async def get_crypto_whale_activity(
 async def get_stock_insider_activity(
     limit: int = Query(default=25, le=50),
     ticker: Optional[str] = Query(default=None, description="Filter by stock ticker"),
-    
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """Get stock insider trading from SEC Form 4 filings"""
+    usage = rate_limiter.check_and_increment(
+        db=db,
+        user_id=current_user.id,
+        tier=current_user.subscription_tier,
+        feature="whale_intel"
+    )
+    
     try:
         activity = await apex_whale_intel.get_stock_insider_activity(limit=limit, ticker=ticker)
-        return {"ok": True, "transactions": activity, "count": len(activity), "asset_type": "stock"}
+        return {"ok": True, "transactions": activity, "count": len(activity), "asset_type": "stock", "usage": usage}
     except Exception as e:
         return {"ok": False, "error": str(e), "transactions": []}
 
@@ -74,19 +104,27 @@ async def get_stock_insider_activity(
 @router.get("/insider-buys")
 async def get_top_insider_buys(
     days: int = Query(default=7, le=30),
-    
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """Get top insider buys - bullish signal when executives buy their own stock"""
+    usage = rate_limiter.check_and_increment(
+        db=db,
+        user_id=current_user.id,
+        tier=current_user.subscription_tier,
+        feature="whale_intel"
+    )
+    
     try:
         buys = await apex_whale_intel.get_top_insider_buys(days=days)
-        return {"ok": True, "buys": buys, "count": len(buys), "days": days}
+        return {"ok": True, "buys": buys, "count": len(buys), "days": days, "usage": usage}
     except Exception as e:
         return {"ok": False, "error": str(e), "buys": []}
 
 
 @router.get("/flows")
 async def get_exchange_flows():
-    """Get exchange inflow/outflow analysis"""
+    """Get exchange inflow/outflow analysis (public endpoint)"""
     try:
         flows = await apex_whale_intel.get_exchange_flows()
         return flows
@@ -95,18 +133,28 @@ async def get_exchange_flows():
 
 
 @router.get("/insights")
-async def get_whale_insights():
+async def get_whale_insights(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """Get actionable whale insights combining crypto and stocks"""
+    usage = rate_limiter.check_and_increment(
+        db=db,
+        user_id=current_user.id,
+        tier=current_user.subscription_tier,
+        feature="whale_intel"
+    )
+    
     try:
         insights = await apex_whale_intel.get_whale_insights()
-        return {"ok": True, "insights": insights, "count": len(insights)}
+        return {"ok": True, "insights": insights, "count": len(insights), "usage": usage}
     except Exception as e:
         return {"ok": False, "error": str(e), "insights": []}
 
 
 @router.get("/sentiment")
 async def get_whale_sentiment():
-    """Get overall smart money sentiment score"""
+    """Get overall smart money sentiment score (public endpoint)"""
     try:
         feed = await apex_whale_intel.get_unified_whale_feed(limit=50)
         summary = feed.get("summary", {})
