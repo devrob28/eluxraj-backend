@@ -35,7 +35,7 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
             email_alerts=True,
             push_alerts=True,
             is_active=True,
-            is_verified=False
+            is_verified=True
         )
         
         db.add(user)
