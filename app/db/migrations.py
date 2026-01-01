@@ -13,14 +13,14 @@ def run_migrations(engine):
             conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)"))
             conn.commit()
             logger.info("✅ Migration: phone column ready")
-        
+        except Exception as e:
+            logger.warning(f"Migration note: {e}")
+
         # Add device_token column for iOS push notifications
         try:
             conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS device_token VARCHAR(255)"))
             conn.commit()
             logger.info("✅ Migration: device_token column ready")
-        except Exception as e:
-            logger.warning(f"Migration note: {e}")
         except Exception as e:
             logger.warning(f"Migration note: {e}")
 
