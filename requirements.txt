@@ -27,3 +27,4 @@ numpy<2
 yfinance==0.2.36
 yfinance==0.2.36
 pywebpush>=2.0.0
+PyJWT==2.8.0
