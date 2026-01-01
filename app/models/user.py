@@ -9,6 +9,7 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     phone = Column(String(20), nullable=True)  # For SMS alerts
     push_subscription = Column(JSON, nullable=True)  # Web push subscription
+    device_token = Column(String(255), nullable=True)  # iOS APNs device token
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255))
     

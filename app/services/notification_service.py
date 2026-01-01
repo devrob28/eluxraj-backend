@@ -7,6 +7,7 @@ from typing import Optional, Dict
 from datetime import datetime, timezone
 from app.core.config import settings
 from app.core.logging import logger
+from app.services.apns_service import apns_service
 
 
 class NotificationService:
@@ -128,9 +129,10 @@ class NotificationService:
         notify_sms: bool = False,
         notify_push: bool = True,
         push_subscription: dict = None,
-        webhook_url: Optional[str] = None
+        webhook_url: Optional[str] = None,
+        device_token: Optional[str] = None
     ) -> Dict:
-        results = {"email": False, "sms": False, "push": False, "webhook": False}
+        results = {"email": False, "sms": False, "push": False, "webhook": False, "apns": False}
         
         direction = "above" if "above" in condition else "below"
         subject = f"🚨 ELUXRAJ Alert: {asset} Price Alert"
@@ -170,6 +172,15 @@ class NotificationService:
         
         if notify_push and push_subscription:
             results["push"] = await self.send_push(push_subscription, subject, text_message)
+        
+        if device_token:
+            results["apns"] = await apns_service.send_price_alert(
+                device_token=device_token,
+                asset=asset,
+                current_price=current_price,
+                threshold=threshold,
+                direction=direction
+            )
         
         if webhook_url:
             results["webhook"] = await self.send_webhook(webhook_url, {

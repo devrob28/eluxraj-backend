@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     # Push Notifications
     VAPID_PRIVATE_KEY: Optional[str] = os.getenv("VAPID_PRIVATE_KEY")
     VAPID_PUBLIC_KEY: Optional[str] = os.getenv("VAPID_PUBLIC_KEY")
+    
+    # APNs (iOS Push)
+    APNS_KEY_ID: Optional[str] = os.getenv("APNS_KEY_ID")
+    APNS_TEAM_ID: Optional[str] = os.getenv("APNS_TEAM_ID")
+    APNS_BUNDLE_ID: str = os.getenv("APNS_BUNDLE_ID", "com.eluxraj.app")
+    APNS_KEY_PATH: Optional[str] = os.getenv("APNS_KEY_PATH")
+    APNS_SANDBOX: bool = os.getenv("APNS_SANDBOX", "true").lower() == "true"
     ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
 
     class Config:

@@ -43,3 +43,30 @@ async def unsubscribe_push(user=Depends(get_current_user), db: Session = Depends
     user.push_subscription = None
     db.commit()
     return {"ok": True, "message": "Unsubscribed from push notifications"}
+
+
+class DeviceTokenRequest(BaseModel):
+    deviceToken: str
+    platform: str = "ios"
+
+@router.post("/device-token")
+async def register_device_token(
+    request: DeviceTokenRequest,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Register iOS device token for APNs"""
+    user.device_token = request.deviceToken
+    db.commit()
+    logger.info(f"iOS device token registered for user {user.id}")
+    return {"ok": True, "message": "Device token registered"}
+
+@router.delete("/device-token")
+async def remove_device_token(
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Remove iOS device token"""
+    user.device_token = None
+    db.commit()
+    return {"ok": True, "message": "Device token removed"}
