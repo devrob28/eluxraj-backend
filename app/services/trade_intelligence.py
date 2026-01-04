@@ -260,23 +260,45 @@ RESPOND WITH VALID JSON ONLY:
     
     def _parse_json_response(self, content: str) -> Dict:
         """Parse JSON from AI response"""
-        try:
-            return json.loads(content)
-        except:
+        content = content.strip()
+        
+        # Remove markdown code blocks
+        if content.startswith("```"):
             import re
             match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', content)
             if match:
-                try:
-                    return json.loads(match.group(1))
-                except:
-                    pass
-            match = re.search(r'\{[\s\S]*\}', content)
-            if match:
-                try:
-                    return json.loads(match.group(0))
-                except:
-                    pass
-        logger.error(f"Failed to parse AI response: {content[:500]}")
+                content = match.group(1).strip()
+        
+        # Try direct parse
+        try:
+            result = json.loads(content)
+            logger.info("Successfully parsed JSON response")
+            return result
+        except json.JSONDecodeError as e:
+            logger.warning(f"Direct JSON parse failed: {e}")
+        
+        # Find JSON object with brace matching
+        try:
+            start = content.find("{")
+            if start != -1:
+                depth = 0
+                end = start
+                for i, char in enumerate(content[start:], start):
+                    if char == "{":
+                        depth += 1
+                    elif char == "}":
+                        depth -= 1
+                        if depth == 0:
+                            end = i + 1
+                            break
+                json_str = content[start:end]
+                result = json.loads(json_str)
+                logger.info("Successfully parsed extracted JSON")
+                return result
+        except json.JSONDecodeError as e:
+            logger.error(f"Extracted JSON parse failed: {e}")
+        
+        logger.error(f"All JSON parsing attempts failed")
         return self._fallback_playbook()
     
     def _fallback_playbook(self) -> Dict:
