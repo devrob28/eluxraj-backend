@@ -1,13 +1,14 @@
 """
-Trade Intelligence Service V2
+Trade Intelligence Service V2 - Production Ready
 Institutional-grade AI-powered trade playbooks and chart analysis
 """
 import httpx
 import json
-import base64
 import os
-from typing import Dict, Optional, List
-from datetime import datetime, timezone, timedelta
+import re
+import base64
+from typing import Dict, Optional
+from datetime import datetime, timezone
 from app.core.logging import logger
 
 
@@ -16,30 +17,9 @@ class TradeIntelligenceService:
     
     ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
     
-    def __init__(self):
-        """Initialize service"""
-        pass
-    
     def _get_api_key(self) -> Optional[str]:
-        """Get API key from environment or settings"""
-        # Try direct environment variable first
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if api_key:
-            logger.info(f"Got API key from env (length: {len(api_key)})")
-            return api_key
-        
-        # Try settings
-        try:
-            from app.core.config import settings
-            api_key = getattr(settings, "ANTHROPIC_API_KEY", None)
-            if api_key:
-                logger.info(f"Got API key from settings (length: {len(api_key)})")
-                return api_key
-        except Exception as e:
-            logger.error(f"Failed to get API key from settings: {e}")
-        
-        logger.error("No ANTHROPIC_API_KEY found in env or settings")
-        return None
+        """Get API key from environment"""
+        return os.getenv("ANTHROPIC_API_KEY")
     
     async def generate_playbook(
         self,
@@ -49,63 +29,54 @@ class TradeIntelligenceService:
         current_price: float,
         market_data: Dict = None
     ) -> Dict:
-        """Generate a complete trade playbook for an asset"""
+        """Generate a complete trade playbook"""
         
-        # Timeframe context
-        tf_context = {
-            "15m": "scalping/intraday - focus on immediate momentum, tight stops, quick targets",
-            "1h": "intraday swing - balance momentum with structure, 4-8 hour hold times",
-            "4h": "swing trading - focus on trend structure, 1-5 day hold times typical",
-            "1d": "position trading - focus on major levels, weekly trends, 1-4 week holds",
-            "1w": "macro positioning - focus on monthly/quarterly trends, multi-week to month holds"
-        }.get(timeframe, "swing trading perspective")
-        
-        prompt = f"""You are a senior quantitative analyst at a top-tier hedge fund. Analyze {asset} ({asset_type}) on the {timeframe} timeframe.
-
+        prompt = f"""You are a senior quantitative analyst. Analyze {asset} ({asset_type}) on the {timeframe} timeframe.
 Current Price: ${current_price:,.2f}
-Analysis Time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}
+Time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}
 
-Provide a complete trade playbook with entry zones, stop loss, take profit targets, and scenario analysis.
+Provide a trade playbook. Return ONLY valid JSON, no markdown code blocks, no extra text.
 
-RESPOND WITH VALID JSON ONLY:
-
+The JSON must have this exact structure:
 {{
-    "market_bias": "bullish|bearish|neutral",
-    "bias_strength": <50-85>,
-    "market_structure": "trending_up|trending_down|ranging|breakout|breakdown",
+    "market_bias": "bullish",
+    "bias_strength": 68,
+    "market_structure": "trending_up",
     "entry_zone": {{
-        "low": <price within 3% below current>,
-        "high": <price within 2% above current>,
-        "rationale": "<reason>"
+        "low": {round(current_price * 0.97, 2)},
+        "high": {round(current_price * 1.01, 2)},
+        "rationale": "Key support zone with buyer interest"
     }},
     "stop_loss": {{
-        "price": <price>,
-        "percentage": <2-8>,
-        "rationale": "<reason>"
+        "price": {round(current_price * 0.94, 2)},
+        "percentage": 6,
+        "rationale": "Below major support structure"
     }},
     "take_profits": [
-        {{"level": "TP1", "price": <target1>, "probability": <50-70>, "rationale": "<reason>"}},
-        {{"level": "TP2", "price": <target2>, "probability": <30-50>, "rationale": "<reason>"}},
-        {{"level": "TP3", "price": <target3>, "probability": <15-35>, "rationale": "<reason>"}}
+        {{"level": "TP1", "price": {round(current_price * 1.05, 2)}, "probability": 65, "rationale": "Near resistance"}},
+        {{"level": "TP2", "price": {round(current_price * 1.10, 2)}, "probability": 45, "rationale": "Major resistance"}},
+        {{"level": "TP3", "price": {round(current_price * 1.18, 2)}, "probability": 25, "rationale": "Extended target"}}
     ],
-    "risk_reward_ratio": <calculated RR>,
-    "probability_score": <40-75>,
-    "confidence_score": <50-80>,
-    "pattern_detected": "<pattern or 'No clear pattern'>",
+    "risk_reward_ratio": 2.5,
+    "probability_score": 62,
+    "confidence_score": 70,
+    "pattern_detected": "Higher lows forming",
     "bullish_scenarios": [
-        {{"name": "<scenario>", "probability": <20-50>, "trigger": "<trigger>", "target": <price>, "explanation": "<reasoning>"}},
-        {{"name": "<scenario2>", "probability": <15-40>, "trigger": "<trigger>", "target": <price>, "explanation": "<reasoning>"}},
-        {{"name": "<scenario3>", "probability": <10-30>, "trigger": "<trigger>", "target": <price>, "explanation": "<reasoning>"}}
+        {{"name": "Breakout Rally", "probability": 40, "trigger": "Break above resistance", "target": {round(current_price * 1.12, 2)}, "explanation": "Momentum continuation if key level breaks"}},
+        {{"name": "Support Bounce", "probability": 35, "trigger": "Hold support zone", "target": {round(current_price * 1.08, 2)}, "explanation": "Buyers defend key level"}},
+        {{"name": "Accumulation Break", "probability": 20, "trigger": "Volume spike", "target": {round(current_price * 1.15, 2)}, "explanation": "Institutional accumulation completes"}}
     ],
     "bearish_scenarios": [
-        {{"name": "<scenario>", "probability": <20-50>, "trigger": "<trigger>", "target": <price>, "explanation": "<reasoning>"}},
-        {{"name": "<scenario2>", "probability": <15-40>, "trigger": "<trigger>", "target": <price>, "explanation": "<reasoning>"}},
-        {{"name": "<scenario3>", "probability": <10-30>, "trigger": "<trigger>", "target": <price>, "explanation": "<reasoning>"}}
+        {{"name": "Support Breakdown", "probability": 25, "trigger": "Break below support", "target": {round(current_price * 0.92, 2)}, "explanation": "Sellers overwhelm buyers"}},
+        {{"name": "Lower High Rejection", "probability": 20, "trigger": "Fail at resistance", "target": {round(current_price * 0.95, 2)}, "explanation": "Trend reversal signal"}},
+        {{"name": "Momentum Fade", "probability": 15, "trigger": "Volume decline", "target": {round(current_price * 0.90, 2)}, "explanation": "Buying pressure exhausted"}}
     ],
-    "invalidation_conditions": ["<condition1>", "<condition2>"],
-    "invalidation_price": <price>,
-    "reasoning": "<4-6 sentence comprehensive analysis>"
-}}"""
+    "invalidation_conditions": ["Close below ${round(current_price * 0.93, 2)}", "Break of market structure"],
+    "invalidation_price": {round(current_price * 0.93, 2)},
+    "reasoning": "Price is showing strength with higher lows. Key support holding well. Watch for breakout above resistance for continuation. Risk management essential with stop below structure."
+}}
+
+Now analyze {asset} at ${current_price:,.2f} and provide YOUR analysis with realistic values based on current market conditions. Return only the JSON object."""
 
         return await self._call_ai(prompt)
     
@@ -120,46 +91,44 @@ RESPOND WITH VALID JSON ONLY:
         try:
             with open(image_path, "rb") as f:
                 image_data = base64.b64encode(f.read()).decode("utf-8")
-            
             media_type = "image/png" if image_path.lower().endswith(".png") else "image/jpeg"
         except Exception as e:
             logger.error(f"Failed to read image: {e}")
-            return self._fallback_analysis(asset, timeframe)
+            return self._fallback_analysis()
         
-        prompt = f"""Analyze this {asset} chart on the {timeframe} timeframe.
+        prompt = f"""Analyze this {asset} chart ({timeframe} timeframe).
 
-Provide technical analysis with key levels, patterns, and trade recommendations.
-
-RESPOND WITH VALID JSON ONLY:
-
+Return ONLY valid JSON with this structure:
 {{
-    "chart_quality": "clear|moderate|poor",
-    "trend_direction": "uptrend|downtrend|sideways",
-    "pattern_detected": "<pattern name>",
-    "market_structure": "trending_up|trending_down|ranging|breakout|breakdown",
+    "chart_quality": "clear",
+    "trend_direction": "uptrend",
+    "pattern_detected": "ascending triangle",
+    "market_structure": "trending_up",
     "key_levels": {{
-        "support": ["<price1>", "<price2>"],
-        "resistance": ["<price1>", "<price2>"]
+        "support": ["price1", "price2"],
+        "resistance": ["price1", "price2"]
     }},
     "bullish_scenarios": [
-        {{"name": "<scenario>", "probability": <20-60>, "trigger": "<trigger>", "target": "<price>", "explanation": "<reasoning>"}}
+        {{"name": "Breakout", "probability": 45, "trigger": "Break resistance", "target": "price", "explanation": "Reason"}}
     ],
     "bearish_scenarios": [
-        {{"name": "<scenario>", "probability": <20-60>, "trigger": "<trigger>", "target": "<price>", "explanation": "<reasoning>"}}
+        {{"name": "Breakdown", "probability": 30, "trigger": "Break support", "target": "price", "explanation": "Reason"}}
     ],
-    "trade_recommendation": "long|short|wait",
+    "trade_recommendation": "long",
     "trade_setup": {{
-        "bias": "bullish|bearish|neutral",
-        "entry_zone": "<price zone>",
-        "stop_loss": "<price>",
-        "take_profit_1": "<price>",
-        "take_profit_2": "<price>",
-        "risk_reward": "<ratio>"
+        "bias": "bullish",
+        "entry_zone": "price range",
+        "stop_loss": "price",
+        "take_profit_1": "price",
+        "take_profit_2": "price",
+        "risk_reward": "2.5"
     }},
-    "confidence_score": <40-85>,
-    "invalidation_conditions": ["<condition>"],
-    "reasoning": "<5-7 sentence analysis>"
-}}"""
+    "confidence_score": 72,
+    "invalidation_conditions": ["condition1"],
+    "reasoning": "Detailed 3-5 sentence analysis of the chart."
+}}
+
+Analyze the chart and return your JSON analysis."""
 
         return await self._call_ai_with_image(prompt, image_data, media_type)
     
@@ -167,10 +136,11 @@ RESPOND WITH VALID JSON ONLY:
         """Call Anthropic API for text analysis"""
         api_key = self._get_api_key()
         if not api_key:
+            logger.error("No API key found")
             return self._fallback_playbook()
         
         try:
-            logger.info("Making Anthropic API call...")
+            logger.info("Calling Anthropic API...")
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     self.ANTHROPIC_API,
@@ -181,37 +151,39 @@ RESPOND WITH VALID JSON ONLY:
                     },
                     json={
                         "model": "claude-3-haiku-20240307",
-                        "max_tokens": 4096,
+                        "max_tokens": 2000,
                         "messages": [{"role": "user", "content": prompt}]
                     },
-                    timeout=90.0
+                    timeout=60.0
                 )
                 
-                logger.info(f"Anthropic API response status: {response.status_code}")
+                logger.info(f"API status: {response.status_code}")
                 
                 if response.status_code == 200:
                     data = response.json()
                     content = data["content"][0]["text"]
-                    logger.info(f"Got AI response, length: {len(content)}")
+                    logger.info(f"Got response, length: {len(content)}")
                     return self._parse_json_response(content)
                 else:
-                    logger.error(f"Anthropic API error: {response.status_code} - {response.text[:500]}")
+                    logger.error(f"API error: {response.status_code} - {response.text[:200]}")
                     return self._fallback_playbook()
+                    
         except httpx.TimeoutException:
-            logger.error("Anthropic API timeout")
+            logger.error("API timeout")
             return self._fallback_playbook()
         except Exception as e:
-            logger.error(f"AI call failed: {type(e).__name__}: {e}")
+            logger.error(f"API call failed: {e}")
             return self._fallback_playbook()
     
     async def _call_ai_with_image(self, prompt: str, image_data: str, media_type: str) -> Dict:
         """Call Anthropic API with image"""
         api_key = self._get_api_key()
         if not api_key:
-            return self._fallback_analysis("", "")
+            logger.error("No API key found")
+            return self._fallback_analysis()
         
         try:
-            logger.info("Making Anthropic API call with image...")
+            logger.info("Calling Anthropic API with image...")
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     self.ANTHROPIC_API,
@@ -222,7 +194,7 @@ RESPOND WITH VALID JSON ONLY:
                     },
                     json={
                         "model": "claude-3-haiku-20240307",
-                        "max_tokens": 4096,
+                        "max_tokens": 2000,
                         "messages": [{
                             "role": "user",
                             "content": [
@@ -238,67 +210,99 @@ RESPOND WITH VALID JSON ONLY:
                             ]
                         }]
                     },
-                    timeout=120.0
+                    timeout=90.0
                 )
                 
-                logger.info(f"Anthropic API response status: {response.status_code}")
+                logger.info(f"API status: {response.status_code}")
                 
                 if response.status_code == 200:
                     data = response.json()
                     content = data["content"][0]["text"]
-                    logger.info(f"Got AI response, length: {len(content)}")
+                    logger.info(f"Got response, length: {len(content)}")
                     return self._parse_json_response(content)
                 else:
-                    logger.error(f"Anthropic API error: {response.status_code} - {response.text[:500]}")
-                    return self._fallback_analysis("", "")
+                    logger.error(f"API error: {response.status_code} - {response.text[:200]}")
+                    return self._fallback_analysis()
+                    
         except httpx.TimeoutException:
-            logger.error("Anthropic API timeout (image)")
-            return self._fallback_analysis("", "")
+            logger.error("API timeout (image)")
+            return self._fallback_analysis()
         except Exception as e:
-            logger.error(f"AI image call failed: {type(e).__name__}: {e}")
-            return self._fallback_analysis("", "")
+            logger.error(f"API call failed: {e}")
+            return self._fallback_analysis()
     
     def _parse_json_response(self, content: str) -> Dict:
-        """Parse JSON from AI response"""
+        """Parse JSON from AI response with multiple fallback strategies"""
         content = content.strip()
         
-        # Remove markdown code blocks
-        if content.startswith("```"):
-            import re
+        # Remove markdown code blocks if present
+        if "```" in content:
             match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', content)
             if match:
                 content = match.group(1).strip()
         
-        # Try direct parse
+        # Strategy 1: Direct parse
         try:
             result = json.loads(content)
-            logger.info("Successfully parsed JSON response")
+            logger.info("JSON parsed successfully (direct)")
             return result
         except json.JSONDecodeError as e:
-            logger.warning(f"Direct JSON parse failed: {e}")
+            logger.warning(f"Direct parse failed: {e}")
         
-        # Find JSON object with brace matching
+        # Strategy 2: Find JSON object with brace matching
         try:
             start = content.find("{")
             if start != -1:
                 depth = 0
                 end = start
+                in_string = False
+                escape_next = False
+                
                 for i, char in enumerate(content[start:], start):
-                    if char == "{":
+                    if escape_next:
+                        escape_next = False
+                        continue
+                    if char == '\\':
+                        escape_next = True
+                        continue
+                    if char == '"' and not escape_next:
+                        in_string = not in_string
+                        continue
+                    if in_string:
+                        continue
+                    if char == '{':
                         depth += 1
-                    elif char == "}":
+                    elif char == '}':
                         depth -= 1
                         if depth == 0:
                             end = i + 1
                             break
-                json_str = content[start:end]
-                result = json.loads(json_str)
-                logger.info("Successfully parsed extracted JSON")
-                return result
+                
+                if depth == 0 and end > start:
+                    json_str = content[start:end]
+                    result = json.loads(json_str)
+                    logger.info("JSON parsed successfully (extracted)")
+                    return result
         except json.JSONDecodeError as e:
-            logger.error(f"Extracted JSON parse failed: {e}")
+            logger.warning(f"Extracted parse failed: {e}")
+        except Exception as e:
+            logger.warning(f"Extraction error: {e}")
         
-        logger.error(f"All JSON parsing attempts failed")
+        # Strategy 3: Try to fix common JSON issues
+        try:
+            # Remove any trailing commas before } or ]
+            fixed = re.sub(r',\s*([}\]])', r'\1', content)
+            # Find JSON again
+            start = fixed.find("{")
+            end = fixed.rfind("}") + 1
+            if start != -1 and end > start:
+                result = json.loads(fixed[start:end])
+                logger.info("JSON parsed successfully (fixed)")
+                return result
+        except:
+            pass
+        
+        logger.error(f"All JSON parsing failed. Content preview: {content[:300]}...")
         return self._fallback_playbook()
     
     def _fallback_playbook(self) -> Dict:
@@ -306,6 +310,7 @@ RESPOND WITH VALID JSON ONLY:
         return {
             "market_bias": "neutral",
             "bias_strength": 50,
+            "market_structure": "unclear",
             "entry_zone": {"low": 0, "high": 0, "rationale": "AI analysis temporarily unavailable - please try again"},
             "stop_loss": {"price": 0, "percentage": 5, "rationale": "Default 5%"},
             "take_profits": [
@@ -316,33 +321,33 @@ RESPOND WITH VALID JSON ONLY:
             "risk_reward_ratio": 0,
             "probability_score": 50,
             "confidence_score": 0,
-            "bullish_scenarios": [{"name": "Analysis Pending", "probability": 33, "trigger": "N/A", "target": 0, "explanation": "AI analysis temporarily unavailable. Please try again in a moment."}],
-            "bearish_scenarios": [{"name": "Analysis Pending", "probability": 33, "trigger": "N/A", "target": 0, "explanation": "AI analysis temporarily unavailable. Please try again in a moment."}],
+            "pattern_detected": "Pending",
+            "bullish_scenarios": [{"name": "Analysis Pending", "probability": 33, "trigger": "N/A", "target": 0, "explanation": "AI analysis temporarily unavailable."}],
+            "bearish_scenarios": [{"name": "Analysis Pending", "probability": 33, "trigger": "N/A", "target": 0, "explanation": "AI analysis temporarily unavailable."}],
             "invalidation_conditions": ["Analysis unavailable - please retry"],
             "invalidation_price": 0,
-            "pattern_detected": "Pending",
-            "market_structure": "unclear",
-            "reasoning": "AI analysis temporarily unavailable. This could be due to high demand or a temporary service issue. Please try again in a few moments.",
+            "reasoning": "AI analysis temporarily unavailable. Please try again in a few moments.",
             "error": True
         }
     
-    def _fallback_analysis(self, asset: str, timeframe: str) -> Dict:
+    def _fallback_analysis(self) -> Dict:
         """Return fallback for chart analysis"""
         return {
             "chart_quality": "unknown",
+            "trend_direction": "unclear",
             "pattern_detected": "Analysis pending",
             "market_structure": "unclear",
             "key_levels": {"support": [], "resistance": []},
-            "bullish_scenarios": [{"name": "Analysis Pending", "probability": 33, "trigger": "N/A", "target": "N/A", "explanation": "AI analysis temporarily unavailable"}],
-            "bearish_scenarios": [{"name": "Analysis Pending", "probability": 33, "trigger": "N/A", "target": "N/A", "explanation": "AI analysis temporarily unavailable"}],
+            "bullish_scenarios": [{"name": "Pending", "probability": 33, "trigger": "N/A", "target": "N/A", "explanation": "AI analysis temporarily unavailable"}],
+            "bearish_scenarios": [{"name": "Pending", "probability": 33, "trigger": "N/A", "target": "N/A", "explanation": "AI analysis temporarily unavailable"}],
             "trade_recommendation": "wait",
             "trade_setup": {
-                "entry": "N/A",
+                "bias": "neutral",
+                "entry_zone": "N/A",
                 "stop_loss": "N/A",
                 "take_profit_1": "N/A",
                 "take_profit_2": "N/A",
-                "take_profit_3": "N/A",
-                "risk_reward": 0
+                "risk_reward": "0"
             },
             "confidence_score": 0,
             "invalidation_conditions": ["Analysis unavailable"],
