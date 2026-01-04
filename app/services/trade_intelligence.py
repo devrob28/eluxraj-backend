@@ -17,7 +17,8 @@ class TradeIntelligenceService:
     ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
     
     def __init__(self):
-        self.api_key = getattr(settings, 'ANTHROPIC_API_KEY', None)
+        """Initialize service"""
+        # API key loaded dynamically in each call
     
     async def generate_playbook(
         self,
@@ -398,8 +399,9 @@ RESPOND WITH VALID JSON ONLY:
     
     async def _call_ai(self, prompt: str) -> Dict:
         """Call Anthropic API for text analysis"""
-        if not self.api_key:
-            logger.warning("Anthropic API key not configured")
+        api_key = getattr(settings, "ANTHROPIC_API_KEY", None)
+        if not api_key:
+            logger.error("ANTHROPIC_API_KEY not found in settings")
             return self._fallback_playbook()
         
         try:
@@ -407,7 +409,7 @@ RESPOND WITH VALID JSON ONLY:
                 response = await client.post(
                     self.ANTHROPIC_API,
                     headers={
-                        "x-api-key": self.api_key,
+                        "x-api-key": api_key,
                         "anthropic-version": "2023-06-01",
                         "content-type": "application/json"
                     },
@@ -432,8 +434,9 @@ RESPOND WITH VALID JSON ONLY:
     
     async def _call_ai_with_image(self, prompt: str, image_data: str, media_type: str) -> Dict:
         """Call Anthropic API with image"""
-        if not self.api_key:
-            logger.warning("Anthropic API key not configured")
+        api_key = getattr(settings, "ANTHROPIC_API_KEY", None)
+        if not api_key:
+            logger.error("ANTHROPIC_API_KEY not found in settings")
             return self._fallback_analysis("", "")
         
         try:
@@ -441,7 +444,7 @@ RESPOND WITH VALID JSON ONLY:
                 response = await client.post(
                     self.ANTHROPIC_API,
                     headers={
-                        "x-api-key": self.api_key,
+                        "x-api-key": api_key,
                         "anthropic-version": "2023-06-01",
                         "content-type": "application/json"
                     },
