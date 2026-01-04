@@ -5,9 +5,9 @@ Institutional-grade AI-powered trade playbooks and chart analysis
 import httpx
 import json
 import base64
+import os
 from typing import Dict, Optional, List
 from datetime import datetime, timezone, timedelta
-from app.core.config import settings
 from app.core.logging import logger
 
 
@@ -18,7 +18,28 @@ class TradeIntelligenceService:
     
     def __init__(self):
         """Initialize service"""
-        # API key loaded dynamically in each call
+        pass
+    
+    def _get_api_key(self) -> Optional[str]:
+        """Get API key from environment or settings"""
+        # Try direct environment variable first
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if api_key:
+            logger.info(f"Got API key from env (length: {len(api_key)})")
+            return api_key
+        
+        # Try settings
+        try:
+            from app.core.config import settings
+            api_key = getattr(settings, "ANTHROPIC_API_KEY", None)
+            if api_key:
+                logger.info(f"Got API key from settings (length: {len(api_key)})")
+                return api_key
+        except Exception as e:
+            logger.error(f"Failed to get API key from settings: {e}")
+        
+        logger.error("No ANTHROPIC_API_KEY found in env or settings")
+        return None
     
     async def generate_playbook(
         self,
@@ -39,155 +60,51 @@ class TradeIntelligenceService:
             "1w": "macro positioning - focus on monthly/quarterly trends, multi-week to month holds"
         }.get(timeframe, "swing trading perspective")
         
-        prompt = f"""You are a senior quantitative analyst at a top-tier hedge fund with 15+ years experience trading {asset_type} markets. You combine technical analysis, market structure analysis, order flow concepts, and risk management into actionable trade intelligence.
+        prompt = f"""You are a senior quantitative analyst at a top-tier hedge fund. Analyze {asset} ({asset_type}) on the {timeframe} timeframe.
 
-═══════════════════════════════════════════════════════════════
-ANALYSIS REQUEST
-═══════════════════════════════════════════════════════════════
-ASSET: {asset}
-ASSET TYPE: {asset_type}
-TIMEFRAME: {timeframe} ({tf_context})
-CURRENT PRICE: ${current_price:,.2f}
-ANALYSIS TIME: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}
-{f"SUPPLEMENTAL DATA: {json.dumps(market_data)}" if market_data else ""}
+Current Price: ${current_price:,.2f}
+Analysis Time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}
 
-═══════════════════════════════════════════════════════════════
-YOUR ANALYSIS FRAMEWORK
-═══════════════════════════════════════════════════════════════
+Provide a complete trade playbook with entry zones, stop loss, take profit targets, and scenario analysis.
 
-1. MARKET STRUCTURE ANALYSIS
-   - Identify current trend (HH/HL for uptrend, LH/LL for downtrend)
-   - Locate key swing points and structure breaks
-   - Determine if price is in markup, markdown, accumulation, or distribution
-
-2. KEY LEVEL IDENTIFICATION  
-   - Major support/resistance from recent price action
-   - Round psychological numbers
-   - Previous day/week/month highs and lows
-   - Areas of high volume/liquidity
-
-3. PATTERN RECOGNITION
-   - Classic patterns: triangles, wedges, channels, head & shoulders
-   - Candlestick patterns: engulfing, doji, hammers at key levels
-   - Momentum divergences if applicable
-
-4. TRADE SETUP CONSTRUCTION
-   - Entry zone: Where institutional buyers/sellers likely step in
-   - Stop loss: Beyond structure that invalidates the thesis
-   - Targets: Scaled exits at logical resistance/support levels
-   - Risk/Reward: Minimum 2:1 for valid setups
-
-5. SCENARIO PLANNING
-   - Map out 3 bullish and 3 bearish scenarios with specific triggers
-   - Assign realistic probabilities that reflect uncertainty
-   - Include invalidation conditions for each scenario
-
-═══════════════════════════════════════════════════════════════
-CRITICAL RULES
-═══════════════════════════════════════════════════════════════
-- PRICES MUST BE REALISTIC relative to current price ${current_price:,.2f}
-- Entry zones should be within 5% of current price for {timeframe} timeframe
-- Stop losses should be 2-8% from entry depending on timeframe
-- Take profits should be at logical levels (prior highs/lows, fib extensions, round numbers)
-- Risk/Reward must be calculated as: (TP1 - Entry) / (Entry - StopLoss)
-- Probabilities should reflect genuine uncertainty - avoid 90%+ confidence
-- This is DECISION INTELLIGENCE, not financial advice
-
-═══════════════════════════════════════════════════════════════
-RESPOND WITH VALID JSON ONLY (no markdown, no explanation outside JSON):
-═══════════════════════════════════════════════════════════════
+RESPOND WITH VALID JSON ONLY:
 
 {{
     "market_bias": "bullish|bearish|neutral",
-    "bias_strength": <50-85 realistic range>,
-    "market_structure": "trending_up|trending_down|ranging|breakout|breakdown|accumulation|distribution",
-    "trend_analysis": "<2-3 sentence description of current trend and key levels>",
+    "bias_strength": <50-85>,
+    "market_structure": "trending_up|trending_down|ranging|breakout|breakdown",
     "entry_zone": {{
         "low": <price within 3% below current>,
         "high": <price within 2% above current>,
-        "rationale": "<specific technical reason for this zone>"
+        "rationale": "<reason>"
     }},
     "stop_loss": {{
-        "price": <price below entry zone>,
-        "percentage": <2-8% from mid entry>,
-        "rationale": "<what structure this is below/above>"
+        "price": <price>,
+        "percentage": <2-8>,
+        "rationale": "<reason>"
     }},
     "take_profits": [
-        {{"level": "TP1", "price": <conservative target>, "probability": <50-70>, "rationale": "<nearest resistance/support>"}},
-        {{"level": "TP2", "price": <moderate target>, "probability": <30-50>, "rationale": "<next major level>"}},
-        {{"level": "TP3", "price": <aggressive target>, "probability": <15-35>, "rationale": "<extended target>"}}
+        {{"level": "TP1", "price": <target1>, "probability": <50-70>, "rationale": "<reason>"}},
+        {{"level": "TP2", "price": <target2>, "probability": <30-50>, "rationale": "<reason>"}},
+        {{"level": "TP3", "price": <target3>, "probability": <15-35>, "rationale": "<reason>"}}
     ],
-    "position_sizing": {{
-        "suggested_risk": "1-2% of portfolio",
-        "scaling_strategy": "Enter 50% at zone low, 50% at zone high OR scale in on confirmation"
-    }},
-    "risk_reward_ratio": <calculated RR to TP1, minimum 2.0>,
-    "probability_score": <40-75 realistic range>,
-    "confidence_score": <50-80 realistic range>,
-    "pattern_detected": "<specific pattern or 'No clear pattern - structure-based setup'>",
-    "key_levels": {{
-        "major_resistance": [<price1>, <price2>],
-        "major_support": [<price1>, <price2>],
-        "pivot_point": <key decision level>
-    }},
+    "risk_reward_ratio": <calculated RR>,
+    "probability_score": <40-75>,
+    "confidence_score": <50-80>,
+    "pattern_detected": "<pattern or 'No clear pattern'>",
     "bullish_scenarios": [
-        {{
-            "name": "<specific scenario name>",
-            "probability": <20-50>,
-            "trigger": "<exact price action or event that triggers this>",
-            "target": <price target>,
-            "explanation": "<detailed 2-3 sentence reasoning with specific levels>"
-        }},
-        {{
-            "name": "<scenario 2>",
-            "probability": <15-40>,
-            "trigger": "<trigger>",
-            "target": <target>,
-            "explanation": "<reasoning>"
-        }},
-        {{
-            "name": "<scenario 3>",
-            "probability": <10-30>,
-            "trigger": "<trigger>",
-            "target": <target>,
-            "explanation": "<reasoning>"
-        }}
+        {{"name": "<scenario>", "probability": <20-50>, "trigger": "<trigger>", "target": <price>, "explanation": "<reasoning>"}},
+        {{"name": "<scenario2>", "probability": <15-40>, "trigger": "<trigger>", "target": <price>, "explanation": "<reasoning>"}},
+        {{"name": "<scenario3>", "probability": <10-30>, "trigger": "<trigger>", "target": <price>, "explanation": "<reasoning>"}}
     ],
     "bearish_scenarios": [
-        {{
-            "name": "<specific scenario name>",
-            "probability": <20-50>,
-            "trigger": "<exact price action or event>",
-            "target": <downside target>,
-            "explanation": "<detailed reasoning>"
-        }},
-        {{
-            "name": "<scenario 2>",
-            "probability": <15-40>,
-            "trigger": "<trigger>",
-            "target": <target>,
-            "explanation": "<reasoning>"
-        }},
-        {{
-            "name": "<scenario 3>",
-            "probability": <10-30>,
-            "trigger": "<trigger>",
-            "target": <target>,
-            "explanation": "<reasoning>"
-        }}
+        {{"name": "<scenario>", "probability": <20-50>, "trigger": "<trigger>", "target": <price>, "explanation": "<reasoning>"}},
+        {{"name": "<scenario2>", "probability": <15-40>, "trigger": "<trigger>", "target": <price>, "explanation": "<reasoning>"}},
+        {{"name": "<scenario3>", "probability": <10-30>, "trigger": "<trigger>", "target": <price>, "explanation": "<reasoning>"}}
     ],
-    "invalidation_conditions": [
-        "<specific price level or condition that invalidates bullish thesis>",
-        "<secondary invalidation>",
-        "<time-based invalidation if applicable>"
-    ],
-    "invalidation_price": <price where entire thesis fails>,
-    "trade_management": {{
-        "entry_confirmation": "<what to look for before entering>",
-        "move_stop_to_breakeven": "<condition to move stop>",
-        "partial_profit_taking": "Take 33% at TP1, 33% at TP2, let 34% run to TP3"
-    }},
-    "reasoning": "<comprehensive 4-6 sentence analysis explaining the setup, why levels matter, what you're watching for, and key risks. Be specific about price levels and market structure.>"
+    "invalidation_conditions": ["<condition1>", "<condition2>"],
+    "invalidation_price": <price>,
+    "reasoning": "<4-6 sentence comprehensive analysis>"
 }}"""
 
         return await self._call_ai(prompt)
@@ -200,211 +117,60 @@ RESPOND WITH VALID JSON ONLY (no markdown, no explanation outside JSON):
     ) -> Dict:
         """Analyze a chart image and return trade intelligence"""
         
-        # Read and encode image
         try:
             with open(image_path, "rb") as f:
                 image_data = base64.b64encode(f.read()).decode("utf-8")
             
-            # Detect media type
-            if image_path.lower().endswith(".png"):
-                media_type = "image/png"
-            else:
-                media_type = "image/jpeg"
+            media_type = "image/png" if image_path.lower().endswith(".png") else "image/jpeg"
         except Exception as e:
             logger.error(f"Failed to read image: {e}")
             return self._fallback_analysis(asset, timeframe)
         
-        prompt = f"""You are an elite technical analyst and Fibonacci specialist with 20+ years of institutional trading experience. You combine classical chart analysis with advanced Fibonacci techniques used by professional traders.
+        prompt = f"""Analyze this {asset} chart on the {timeframe} timeframe.
 
-═══════════════════════════════════════════════════════════════
-CHART ANALYSIS REQUEST
-═══════════════════════════════════════════════════════════════
-ASSET: {asset}
-TIMEFRAME: {timeframe}
+Provide technical analysis with key levels, patterns, and trade recommendations.
 
-Analyze this chart with institutional-grade precision. Apply both classical technical analysis AND Fibonacci analysis.
-
-═══════════════════════════════════════════════════════════════
-YOUR ANALYSIS FRAMEWORK
-═══════════════════════════════════════════════════════════════
-
-1. TREND IDENTIFICATION
-   - Determine primary trend direction (HH/HL = uptrend, LH/LL = downtrend)
-   - Identify the most recent significant swing high and swing low
-   - Note any trend line breaks or structure shifts
-
-2. FIBONACCI RETRACEMENT ANALYSIS
-   - Identify the most recent impulse move (swing low to swing high OR swing high to swing low)
-   - Calculate key Fibonacci retracement levels:
-     * 0.236 (23.6%) - Shallow retracement, strong trend
-     * 0.382 (38.2%) - Common retracement in strong trends
-     * 0.500 (50.0%) - Psychological midpoint
-     * 0.618 (61.8%) - Golden ratio, most important level
-     * 0.786 (78.6%) - Deep retracement, last defense
-   - Note which Fib level price is currently at or approaching
-   - Identify confluence zones where Fib levels align with S/R
-
-3. FIBONACCI EXTENSION TARGETS
-   - For profit targets, calculate extensions from the retracement:
-     * 1.272 extension - Conservative target
-     * 1.618 extension - Golden ratio target (most common)
-     * 2.000 extension - Measured move target
-     * 2.618 extension - Extended target
-
-4. PATTERN RECOGNITION
-   - Classical: triangles, wedges, channels, double tops/bottoms, H&S
-   - Harmonic patterns: Gartley, Bat, Butterfly, Crab (if visible)
-   - Note pattern completion percentage
-
-5. KEY LEVEL CONFLUENCE
-   - Where do Fibonacci levels align with horizontal S/R?
-   - Where do Fibonacci levels align with trend lines?
-   - These confluence zones are highest probability areas
-
-6. ENTRY OPTIMIZATION
-   - Best entries occur at Fib levels with confluence
-   - 0.618 retracement + horizontal support = high probability long
-   - 0.618 retracement + horizontal resistance = high probability short
-
-═══════════════════════════════════════════════════════════════
-FIBONACCI TRADING RULES
-═══════════════════════════════════════════════════════════════
-- In UPTREND: Look for longs at 0.382, 0.500, or 0.618 retracements
-- In DOWNTREND: Look for shorts at 0.382, 0.500, or 0.618 retracements  
-- Stop loss goes beyond the 0.786 or recent swing point
-- First target: 0.000 (return to swing high/low)
-- Second target: -0.272 or 1.272 extension
-- Third target: -0.618 or 1.618 extension
-- Risk/Reward should be minimum 2:1
-
-═══════════════════════════════════════════════════════════════
-CRITICAL RULES
-═══════════════════════════════════════════════════════════════
-- Read ACTUAL prices from the chart Y-axis
-- Calculate Fibonacci levels based on visible swing points
-- Only recommend trades at Fibonacci levels with confluence
-- If no clear Fib setup exists, recommend "wait"
-- This is decision intelligence, NOT financial advice
-
-═══════════════════════════════════════════════════════════════
 RESPOND WITH VALID JSON ONLY:
-═══════════════════════════════════════════════════════════════
 
 {{
     "chart_quality": "clear|moderate|poor",
     "trend_direction": "uptrend|downtrend|sideways",
-    "trend_strength": "strong|moderate|weak",
-    "pattern_detected": "<specific pattern name or 'No clear pattern'>",
-    "pattern_completion": "forming|near_completion|completed|failed",
-    "market_structure": "trending_up|trending_down|ranging|breakout|breakdown|unclear",
-    "trend_description": "<2-3 sentence description of trend and structure>",
-    "swing_points": {{
-        "recent_swing_high": "<price from chart>",
-        "recent_swing_low": "<price from chart>",
-        "current_price": "<approximate current price>"
-    }},
-    "fibonacci_analysis": {{
-        "impulse_direction": "up|down",
-        "impulse_start": "<swing low/high price>",
-        "impulse_end": "<swing high/low price>",
-        "fib_236": "<calculated 23.6% level>",
-        "fib_382": "<calculated 38.2% level>",
-        "fib_500": "<calculated 50% level>",
-        "fib_618": "<calculated 61.8% level - GOLDEN RATIO>",
-        "fib_786": "<calculated 78.6% level>",
-        "current_fib_zone": "<which fib level is price at or near>",
-        "fib_confluence": "<describe any confluence with S/R levels>"
-    }},
-    "fibonacci_extensions": {{
-        "ext_1272": "<1.272 extension price>",
-        "ext_1618": "<1.618 extension price - GOLDEN TARGET>",
-        "ext_2000": "<2.0 extension price>"
-    }},
+    "pattern_detected": "<pattern name>",
+    "market_structure": "trending_up|trending_down|ranging|breakout|breakdown",
     "key_levels": {{
         "support": ["<price1>", "<price2>"],
-        "resistance": ["<price1>", "<price2>"],
-        "fib_support_confluence": "<fib level that aligns with support>",
-        "fib_resistance_confluence": "<fib level that aligns with resistance>"
+        "resistance": ["<price1>", "<price2>"]
     }},
-    "candlestick_notes": "<significant candle patterns at key levels/fib zones>",
-    "volume_analysis": "<volume behavior if visible>",
     "bullish_scenarios": [
-        {{
-            "name": "<scenario name>",
-            "probability": <20-60>,
-            "trigger": "<specific price action at fib level>",
-            "target": "<fib extension or key level>",
-            "explanation": "<reasoning with fib levels>"
-        }},
-        {{
-            "name": "<scenario 2>",
-            "probability": <15-45>,
-            "trigger": "<trigger>",
-            "target": "<target>",
-            "explanation": "<reasoning>"
-        }},
-        {{
-            "name": "<scenario 3>",
-            "probability": <10-35>,
-            "trigger": "<trigger>",
-            "target": "<target>",
-            "explanation": "<reasoning>"
-        }}
+        {{"name": "<scenario>", "probability": <20-60>, "trigger": "<trigger>", "target": "<price>", "explanation": "<reasoning>"}}
     ],
     "bearish_scenarios": [
-        {{
-            "name": "<scenario name>",
-            "probability": <20-60>,
-            "trigger": "<specific price action>",
-            "target": "<fib extension or key level>",
-            "explanation": "<reasoning with fib levels>"
-        }},
-        {{
-            "name": "<scenario 2>",
-            "probability": <15-45>,
-            "trigger": "<trigger>",
-            "target": "<target>",
-            "explanation": "<reasoning>"
-        }},
-        {{
-            "name": "<scenario 3>",
-            "probability": <10-35>,
-            "trigger": "<trigger>",
-            "target": "<target>",
-            "explanation": "<reasoning>"
-        }}
+        {{"name": "<scenario>", "probability": <20-60>, "trigger": "<trigger>", "target": "<price>", "explanation": "<reasoning>"}}
     ],
-    "trade_recommendation": "long|short|wait|no_trade",
+    "trade_recommendation": "long|short|wait",
     "trade_setup": {{
         "bias": "bullish|bearish|neutral",
-        "entry_zone": "<fib level or price zone>",
-        "entry_trigger": "<what confirms entry>",
-        "stop_loss": "<beyond fib 0.786 or structure>",
-        "take_profit_1": "<fib extension 1.272 or key level>",
-        "take_profit_2": "<fib extension 1.618 or key level>",
-        "take_profit_3": "<fib extension 2.0 or extended target>",
-        "risk_reward": "<calculated RR ratio>"
+        "entry_zone": "<price zone>",
+        "stop_loss": "<price>",
+        "take_profit_1": "<price>",
+        "take_profit_2": "<price>",
+        "risk_reward": "<ratio>"
     }},
-    "entry_confirmation": "<what to wait for: candle close, volume, etc>",
     "confidence_score": <40-85>,
-    "fib_quality": "<how clean are the fib levels: excellent|good|moderate|poor>",
-    "invalidation_conditions": [
-        "<price level that invalidates the setup>",
-        "<secondary invalidation>"
-    ],
-    "reasoning": "<5-7 sentence comprehensive analysis incorporating Fibonacci levels, confluence zones, pattern recognition, and risk assessment. Be specific about which fib levels matter most and why.>"
+    "invalidation_conditions": ["<condition>"],
+    "reasoning": "<5-7 sentence analysis>"
 }}"""
 
         return await self._call_ai_with_image(prompt, image_data, media_type)
     
     async def _call_ai(self, prompt: str) -> Dict:
         """Call Anthropic API for text analysis"""
-        api_key = getattr(settings, "ANTHROPIC_API_KEY", None)
+        api_key = self._get_api_key()
         if not api_key:
-            logger.error("ANTHROPIC_API_KEY not found in settings")
             return self._fallback_playbook()
         
         try:
+            logger.info("Making Anthropic API call...")
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     self.ANTHROPIC_API,
@@ -421,25 +187,31 @@ RESPOND WITH VALID JSON ONLY:
                     timeout=90.0
                 )
                 
+                logger.info(f"Anthropic API response status: {response.status_code}")
+                
                 if response.status_code == 200:
                     data = response.json()
                     content = data["content"][0]["text"]
+                    logger.info(f"Got AI response, length: {len(content)}")
                     return self._parse_json_response(content)
                 else:
-                    logger.error(f"Anthropic API error: {response.status_code} - {response.text}")
+                    logger.error(f"Anthropic API error: {response.status_code} - {response.text[:500]}")
                     return self._fallback_playbook()
+        except httpx.TimeoutException:
+            logger.error("Anthropic API timeout")
+            return self._fallback_playbook()
         except Exception as e:
-            logger.error(f"AI call failed: {e}")
+            logger.error(f"AI call failed: {type(e).__name__}: {e}")
             return self._fallback_playbook()
     
     async def _call_ai_with_image(self, prompt: str, image_data: str, media_type: str) -> Dict:
         """Call Anthropic API with image"""
-        api_key = getattr(settings, "ANTHROPIC_API_KEY", None)
+        api_key = self._get_api_key()
         if not api_key:
-            logger.error("ANTHROPIC_API_KEY not found in settings")
             return self._fallback_analysis("", "")
         
         try:
+            logger.info("Making Anthropic API call with image...")
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     self.ANTHROPIC_API,
@@ -469,24 +241,28 @@ RESPOND WITH VALID JSON ONLY:
                     timeout=120.0
                 )
                 
+                logger.info(f"Anthropic API response status: {response.status_code}")
+                
                 if response.status_code == 200:
                     data = response.json()
                     content = data["content"][0]["text"]
+                    logger.info(f"Got AI response, length: {len(content)}")
                     return self._parse_json_response(content)
                 else:
-                    logger.error(f"Anthropic API error: {response.status_code} - {response.text}")
+                    logger.error(f"Anthropic API error: {response.status_code} - {response.text[:500]}")
                     return self._fallback_analysis("", "")
+        except httpx.TimeoutException:
+            logger.error("Anthropic API timeout (image)")
+            return self._fallback_analysis("", "")
         except Exception as e:
-            logger.error(f"AI image call failed: {e}")
+            logger.error(f"AI image call failed: {type(e).__name__}: {e}")
             return self._fallback_analysis("", "")
     
     def _parse_json_response(self, content: str) -> Dict:
         """Parse JSON from AI response"""
         try:
-            # Try direct parse
             return json.loads(content)
         except:
-            # Try to extract JSON from markdown code block
             import re
             match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', content)
             if match:
@@ -494,7 +270,6 @@ RESPOND WITH VALID JSON ONLY:
                     return json.loads(match.group(1))
                 except:
                     pass
-            # Try to find JSON object
             match = re.search(r'\{[\s\S]*\}', content)
             if match:
                 try:
