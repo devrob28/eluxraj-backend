@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 365 * 100  # 100 years
     ALGORITHM: str = "HS256"
     
     # Database - Railway provides DATABASE_URL automatically
