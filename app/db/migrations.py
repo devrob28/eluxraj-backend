@@ -41,6 +41,22 @@ def run_migrations(engine):
         except Exception as e:
             logger.warning(f"Migration note: {e}")
 
+        # Add signal fields for Lambda scanner
+        try:
+            conn.execute(text("ALTER TABLE signals ADD COLUMN IF NOT EXISTS target_2 FLOAT"))
+            conn.execute(text("ALTER TABLE signals ADD COLUMN IF NOT EXISTS target_3 FLOAT"))
+            conn.execute(text("ALTER TABLE signals ADD COLUMN IF NOT EXISTS risk_reward FLOAT"))
+            conn.execute(text("ALTER TABLE signals ADD COLUMN IF NOT EXISTS pattern VARCHAR(100)"))
+            conn.execute(text("ALTER TABLE signals ADD COLUMN IF NOT EXISTS catalyst VARCHAR(255)"))
+            conn.execute(text("ALTER TABLE signals ADD COLUMN IF NOT EXISTS urgency VARCHAR(20) DEFAULT 'medium'"))
+            conn.execute(text("ALTER TABLE signals ADD COLUMN IF NOT EXISTS reasoning TEXT"))
+            conn.execute(text("ALTER TABLE signals ADD COLUMN IF NOT EXISTS source VARCHAR(50) DEFAULT 'lambda_scanner'"))
+            conn.commit()
+            logger.info("✅ Migration: signal fields added")
+        except Exception as e:
+            logger.warning(f"Signal fields migration: {e}")
+
+
 def add_push_subscription_column(engine):
     """Add push_subscription column to users table"""
     with engine.connect() as conn:
@@ -50,6 +66,7 @@ def add_push_subscription_column(engine):
             logger.info("Added push_subscription column")
         except Exception as e:
             logger.warning(f"push_subscription column may already exist: {e}")
+
 
 def add_playbook_tables(engine):
     """Add trade_playbooks table"""
