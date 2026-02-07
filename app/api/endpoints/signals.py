@@ -6,26 +6,25 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
 from app.db.session import get_db
 from app.models.user import User
 from app.models.signal import Signal
 from app.core.deps import get_current_user
 from app.core.logging import logger
-from app.services.notification_service import notification_service
 import os
 
 router = APIRouter()
 
 # Service key for Lambda authentication
-SERVICE_KEY = os.environ.get("ELUXRAJ_SERVICE_KEY", "eluxraj-lambda-2026")
+SERVICE_KEY = os.environ.get("ELUXRAJ_SERVICE_KEY", "eluxraj-lambda-signal-scanner-2026")
 
 
 class SignalIngest(BaseModel):
     symbol: str
     timeframe: str
-    signal_type: str  # BUY or SELL
+    signal_type: str
     confidence: int
     entry_price: float
     stop_loss: float
@@ -53,8 +52,6 @@ def verify_service_key(x_service_key: str = Header(None)):
     return True
 
 
-# ============== SIGNAL INGESTION (from Lambda) ==============
-
 @router.post("/ingest")
 async def ingest_signal(
     signal: SignalIngest,
@@ -65,51 +62,58 @@ async def ingest_signal(
     
     logger.info(f"Ingesting signal: {signal.symbol} {signal.signal_type} @ {signal.confidence}%")
     
-    # Check for duplicate (same symbol, timeframe, type within last hour)
-    existing = db.query(Signal).filter(
-        Signal.symbol == signal.symbol.upper(),
-        Signal.timeframe == signal.timeframe,
-        Signal.signal_type == signal.signal_type.lower(),
-        Signal.created_at >= datetime.now(timezone.utc).replace(hour=datetime.now(timezone.utc).hour - 1)
-    ).first()
-    
-    if existing:
-        logger.info(f"Duplicate signal ignored: {signal.symbol}")
-        return {"status": "duplicate", "signal_id": existing.id}
-    
-    # Create new signal
-    new_signal = Signal(
-        symbol=signal.symbol.upper(),
-        pair=f"{signal.symbol.upper()}/USD",
-        asset_type="stock",
-        timeframe=signal.timeframe,
-        signal_type=signal.signal_type.lower(),
-        oracle_score=signal.confidence,
-        entry_price=signal.entry_price,
-        stop_loss=signal.stop_loss,
-        target_price=signal.target_1,
-        target_2=signal.target_2,
-        risk_reward=signal.risk_reward,
-        pattern=signal.pattern,
-        catalyst=signal.catalyst,
-        urgency=signal.urgency,
-        reasoning=signal.reasoning,
-        status="active",
-        source="lambda_scanner"
-    )
-    
-    db.add(new_signal)
-    db.commit()
-    db.refresh(new_signal)
-    
-    logger.info(f"Signal created: ID {new_signal.id}")
-    
-    return {
-        "status": "created",
-        "signal_id": new_signal.id,
-        "symbol": new_signal.symbol,
-        "confidence": new_signal.oracle_score
-    }
+    try:
+        # Check for duplicate (same symbol, timeframe, type within last hour)
+        one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+        existing = db.query(Signal).filter(
+            Signal.symbol == signal.symbol.upper(),
+            Signal.timeframe == signal.timeframe,
+            Signal.signal_type == signal.signal_type.lower(),
+            Signal.created_at >= one_hour_ago
+        ).first()
+        
+        if existing:
+            logger.info(f"Duplicate signal ignored: {signal.symbol}")
+            return {"status": "duplicate", "signal_id": existing.id}
+        
+        # Create new signal
+        new_signal = Signal(
+            symbol=signal.symbol.upper(),
+            pair=f"{signal.symbol.upper()}/USD",
+            asset_type="stock",
+            timeframe=signal.timeframe,
+            signal_type=signal.signal_type.lower(),
+            oracle_score=signal.confidence,
+            entry_price=signal.entry_price,
+            stop_loss=signal.stop_loss,
+            target_price=signal.target_1,
+            target_2=signal.target_2,
+            risk_reward=signal.risk_reward,
+            pattern=signal.pattern,
+            catalyst=signal.catalyst,
+            urgency=signal.urgency,
+            reasoning=signal.reasoning,
+            status="active",
+            source="lambda_scanner"
+        )
+        
+        db.add(new_signal)
+        db.commit()
+        db.refresh(new_signal)
+        
+        logger.info(f"Signal created: ID {new_signal.id}")
+        
+        return {
+            "status": "created",
+            "signal_id": new_signal.id,
+            "symbol": new_signal.symbol,
+            "confidence": new_signal.oracle_score
+        }
+        
+    except Exception as e:
+        logger.error(f"Database error creating signal: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"DB Error: {str(e)}")
 
 
 @router.post("/notify")
@@ -125,7 +129,6 @@ async def notify_users(
     # Get users with push enabled in specified tiers
     users = db.query(User).filter(
         User.subscription_tier.in_(request.tiers),
-        User.push_alerts == True,
         User.is_active == True
     ).all()
     
@@ -139,28 +142,21 @@ async def notify_users(
             title = f"{emoji} {request.symbol} Signal"
             body = f"{request.signal_type} signal at {request.confidence}% confidence"
             
-            # Web push
-            if user.push_subscription:
-                await notification_service.send_push_notification(
-                    subscription=user.push_subscription,
-                    title=title,
-                    body=body,
-                    data={"signal_id": request.signal_id, "symbol": request.symbol}
-                )
-                sent_count += 1
-            
             # iOS push (if device token exists)
-            if user.device_token:
-                from app.services.apns_service import apns_service
-                await apns_service.send_trade_alert(
-                    device_token=user.device_token,
-                    asset=request.symbol,
-                    action=request.signal_type,
-                    price=0,  # Will be fetched by client
-                    confidence=request.confidence
-                )
-                sent_count += 1
-                
+            if hasattr(user, 'device_token') and user.device_token:
+                try:
+                    from app.services.apns_service import apns_service
+                    await apns_service.send_trade_alert(
+                        device_token=user.device_token,
+                        asset=request.symbol,
+                        action=request.signal_type,
+                        price=0,
+                        confidence=request.confidence
+                    )
+                    sent_count += 1
+                except Exception as e:
+                    logger.warning(f"APNs error for user {user.id}: {e}")
+                    
         except Exception as e:
             logger.error(f"Failed to notify user {user.id}: {e}")
     
@@ -171,8 +167,6 @@ async def notify_users(
     }
 
 
-# ============== PUBLIC SIGNAL ENDPOINTS ==============
-
 @router.get("/active")
 async def get_active_signals(
     db: Session = Depends(get_db),
@@ -181,7 +175,6 @@ async def get_active_signals(
 ):
     """Get active signals for the user's tier"""
     
-    # All tiers see signals, but with different detail levels
     signals = db.query(Signal).filter(
         Signal.status == "active"
     ).order_by(desc(Signal.created_at)).limit(limit).all()
@@ -284,6 +277,6 @@ async def get_signal_stats(
         "active_signals": active,
         "signals_today": today_count,
         "win_rate": round(win_rate, 1),
-        "avg_pnl_percent": round(avg_pnl, 2),
+        "avg_pnl_percent": round(float(avg_pnl), 2),
         "closed_trades": len(closed)
     }
