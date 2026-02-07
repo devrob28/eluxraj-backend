@@ -84,6 +84,7 @@ async def ingest_signal(
             timeframe=signal.timeframe,
             signal_type=signal.signal_type.lower(),
             oracle_score=signal.confidence,
+        confidence=float(signal.confidence),
             entry_price=signal.entry_price,
             stop_loss=signal.stop_loss,
             target_price=signal.target_1,
