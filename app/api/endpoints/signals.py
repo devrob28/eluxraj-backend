@@ -89,6 +89,7 @@ async def ingest_signal(
         stop_loss=signal.stop_loss,
         target_price=signal.target_1,
         target_2=signal.target_2,
+        target_2=signal.target_2,
         risk_reward=signal.risk_reward,
         pattern=signal.pattern,
         catalyst=signal.catalyst,
