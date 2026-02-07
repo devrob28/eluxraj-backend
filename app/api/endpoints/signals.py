@@ -96,7 +96,8 @@ async def ingest_signal(
             urgency=signal.urgency,
             reasoning=signal.reasoning,
             status="active",
-            source="lambda_scanner"
+            source="lambda_scanner",
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7)
         )
         
         db.add(new_signal)
