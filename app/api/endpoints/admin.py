@@ -393,3 +393,29 @@ async def broadcast_email(
             pass
     
     return {"message": f"Broadcast sent to {sent} users", "total_recipients": len(users)}
+
+
+@router.get("/debug/db-tables")
+async def debug_db_tables(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    """Debug database tables"""
+    from sqlalchemy import text
+    
+    try:
+        # Check signals table structure
+        result = db.execute(text("""
+            SELECT column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'signals'
+            ORDER BY ordinal_position
+        """))
+        columns = [{"name": row[0], "type": row[1]} for row in result.fetchall()]
+        
+        return {
+            "signals_table_columns": columns,
+            "column_count": len(columns)
+        }
+    except Exception as e:
+        return {"error": str(e)}
