@@ -83,6 +83,8 @@ async def startup_event():
     Base.metadata.create_all(bind=engine)
     from app.db.migrations import run_migrations
     run_migrations(engine)
+    from app.db.migrations import fix_signal_null_constraints
+    fix_signal_null_constraints(engine)
     logger.info("✅ Database tables ready")
     start_scheduler()
 

@@ -161,3 +161,19 @@ def add_chart_analyses_table(engine):
             logger.info("Created chart_analyses table")
         except Exception as e:
             logger.warning(f"chart_analyses table may exist: {e}")
+
+
+def fix_signal_null_constraints(engine):
+    """Remove NOT NULL constraints from optional signal fields"""
+    with engine.connect() as conn:
+        try:
+            # Make optional fields nullable
+            conn.execute(text("ALTER TABLE signals ALTER COLUMN confidence DROP NOT NULL"))
+            conn.execute(text("ALTER TABLE signals ALTER COLUMN risk_reward_ratio DROP NOT NULL"))
+            conn.execute(text("ALTER TABLE signals ALTER COLUMN reasoning_summary DROP NOT NULL"))
+            conn.execute(text("ALTER TABLE signals ALTER COLUMN position_size_suggestion DROP NOT NULL"))
+            conn.execute(text("ALTER TABLE signals ALTER COLUMN model_version DROP NOT NULL"))
+            conn.commit()
+            logger.info("✅ Migration: signal null constraints fixed")
+        except Exception as e:
+            logger.warning(f"Signal constraints migration: {e}")
