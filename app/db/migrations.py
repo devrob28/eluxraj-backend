@@ -173,6 +173,9 @@ def fix_signal_null_constraints(engine):
             conn.execute(text("ALTER TABLE signals ALTER COLUMN reasoning_summary DROP NOT NULL"))
             conn.execute(text("ALTER TABLE signals ALTER COLUMN position_size_suggestion DROP NOT NULL"))
             conn.execute(text("ALTER TABLE signals ALTER COLUMN model_version DROP NOT NULL"))
+            conn.execute(text("ALTER TABLE signals ALTER COLUMN reasoning_factors DROP NOT NULL"))
+            conn.execute(text("ALTER TABLE signals ALTER COLUMN input_snapshot DROP NOT NULL"))
+            conn.execute(text("ALTER TABLE signals ALTER COLUMN data_sources DROP NOT NULL"))
             conn.commit()
             logger.info("✅ Migration: signal null constraints fixed")
         except Exception as e:
