@@ -96,39 +96,80 @@ Now analyze {asset} at ${current_price:,.2f} and provide YOUR analysis with real
             logger.error(f"Failed to read image: {e}")
             return self._fallback_analysis()
         
-        prompt = f"""Analyze this {asset} chart ({timeframe} timeframe).
+        prompt = f"""You are an elite institutional trader analyzing this {asset} chart on the {timeframe} timeframe.
+
+## INSTITUTIONAL PATTERNS TO IDENTIFY:
+
+### QUASIMODO (QM) PATTERNS - High Probability Reversals
+- QM Quick Retest: HH → L → Lower H → LL, entry at QML (original Low)
+- QM Late Retest: Same but delayed retest of QML
+- QM Shadow: HH with wick rejection above QML
+- QM Re-Entry: Failed first entry, price returns to QML
+- Continuation QM: QM within existing trend
+
+### FLAG PATTERNS - Continuation
+- Bull Flag: Sharp up → consolidation → break higher
+- Bear Flag: Sharp down → consolidation → break lower
+- Flag A+B: Double flag structure
+
+### FAKEOUT PATTERNS - Liquidity Grabs
+- Fakeout V1: Break key level → immediate reversal
+- Fakeout V2 (SR Flip): Support becomes Resistance or vice versa
+- Fakeout V3 (Diamond): Diamond shape at key level
+
+### LIQUIDITY PATTERNS
+- Stop Hunt / Supply: Spike above to grab stops → reversal
+- Stop Hunt / Demand: Spike below to grab stops → reversal
+
+### OTHER SETUPS
+- Compression: Tightening range before explosive move
+- Double SSR: Triple touch confirmation
+- 3 Drive: Three weakening pushes
+- Can-Can: Multiple tests of same level
+
+## YOUR TASK:
+1. Identify the market structure (trend, BOS, ChoCH)
+2. Look for any institutional pattern from the list above
+3. Define precise entry, stop loss, and targets
+4. Calculate risk:reward ratio
 
 Return ONLY valid JSON with this structure:
 {{
-    "chart_quality": "clear",
-    "trend_direction": "uptrend",
-    "pattern_detected": "ascending triangle",
-    "market_structure": "trending_up",
+    "market_structure": {{
+        "trend": "bullish/bearish/ranging",
+        "last_bos": "break of structure description",
+        "key_swing_high": "price level",
+        "key_swing_low": "price level"
+    }},
+    "pattern_detected": "Specific pattern name from list above",
+    "pattern_stage": "forming/confirmed/completing",
     "key_levels": {{
+        "qml_level": "price if applicable",
         "support": ["price1", "price2"],
-        "resistance": ["price1", "price2"]
+        "resistance": ["price1", "price2"],
+        "liquidity_zones": ["where stops likely are"]
     }},
     "bullish_scenarios": [
-        {{"name": "Breakout", "probability": 45, "trigger": "Break resistance", "target": "price", "explanation": "Reason"}}
+        {{"name": "Scenario name", "probability": 45, "trigger": "What triggers it", "target": "price", "explanation": "Why"}}
     ],
     "bearish_scenarios": [
-        {{"name": "Breakdown", "probability": 30, "trigger": "Break support", "target": "price", "explanation": "Reason"}}
+        {{"name": "Scenario name", "probability": 30, "trigger": "What triggers it", "target": "price", "explanation": "Why"}}
     ],
-    "trade_recommendation": "long",
+    "trade_recommendation": "BUY/SELL/WAIT",
     "trade_setup": {{
-        "bias": "bullish",
-        "entry_zone": "price range",
+        "bias": "bullish/bearish/neutral",
+        "entry_zone": {{"low": "price", "high": "price"}},
         "stop_loss": "price",
         "take_profit_1": "price",
         "take_profit_2": "price",
-        "risk_reward": "2.5"
+        "risk_reward": "ratio"
     }},
-    "confidence_score": 72,
-    "invalidation_conditions": ["condition1"],
-    "reasoning": "Detailed 3-5 sentence analysis of the chart."
+    "confidence_score": 0-100,
+    "invalidation_conditions": ["what invalidates this setup"],
+    "reasoning": "3-5 sentence institutional analysis explaining the pattern, why it's valid, and the trade logic."
 }}
 
-Analyze the chart and return your JSON analysis."""
+IMPORTANT: Only identify patterns you can clearly see. If no institutional pattern is present, set confidence below 50 and recommendation to WAIT."""
 
         return await self._call_ai_with_image(prompt, image_data, media_type)
     
