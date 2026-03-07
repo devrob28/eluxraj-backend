@@ -169,6 +169,28 @@ Return ONLY valid JSON with this structure:
     "reasoning": "3-5 sentence institutional analysis explaining the pattern, why it's valid, and the trade logic."
 }}
 
+## MOMENTUM & TREND FOLLOWING INDICATORS
+
+### MACD Indicator
+- ENTRY (Long): When MACD line crosses ABOVE the Signal Line (bullish crossover)
+- EXIT (Long): When MACD line crosses BELOW the Signal Line (bearish crossover)
+- Histogram: Green/increasing = bullish momentum, Red/decreasing = bearish
+
+### RSI Indicator (Relative Strength Index)
+- ENTRY (Long): When RSI crosses ABOVE 30 (oversold recovery)
+- EXIT (Long): When RSI crosses BELOW 70 (overbought reversal)
+- Key levels: 30 (oversold), 50 (neutral), 70 (overbought)
+
+### Supertrend Indicator
+- ENTRY (Long): When Supertrend turns GREEN (bullish trend)
+- EXIT (Long): When Supertrend turns RED (trend reversal)
+- Very reliable for trend following
+
+### Parabolic SAR (Stop and Reverse)
+- ENTRY (Long): When price moves ABOVE SAR dots (dots below candles)
+- EXIT (Long): When price moves BELOW SAR dots (dots above candles)
+- Great for trailing stops and trend direction
+
 IMPORTANT: Only identify patterns you can clearly see. If no institutional pattern is present, set confidence below 50 and recommendation to WAIT."""
 
         return await self._call_ai_with_image(prompt, image_data, media_type)
