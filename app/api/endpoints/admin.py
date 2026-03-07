@@ -419,3 +419,19 @@ async def debug_db_tables(
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+@router.post("/migrate-referrals")
+async def migrate_referrals(db: Session = Depends(get_db)):
+    """One-time migration to add referral columns"""
+    from sqlalchemy import text
+    try:
+        db.execute(text('ALTER TABLE users ADD COLUMN referral_code VARCHAR(20) UNIQUE'))
+    except:
+        pass
+    try:
+        db.execute(text('ALTER TABLE users ADD COLUMN referred_by INTEGER'))
+    except:
+        pass
+    db.commit()
+    return {"status": "migration complete"}
