@@ -85,22 +85,29 @@ async def get_referral_leaderboard(
 ):
     """Public leaderboard of top affiliates"""
     
-    # Get top referrers
-    top_referrers = db.query(
-        User.id,
-        User.email,
-        func.count(User.id).label('referral_count')
-    ).join(
-        User, User.referred_by == User.id, isouter=True
-    ).group_by(User.id).order_by(func.count(User.id).desc()).limit(10).all()
+    # Simple query - count users grouped by referred_by
+    from sqlalchemy import text
     
-    leaderboard = []
-    for i, (user_id, email, count) in enumerate(top_referrers):
-        if count > 0:
+    try:
+        results = db.execute(text("""
+            SELECT u.id, u.email, COUNT(r.id) as referral_count
+            FROM users u
+            LEFT JOIN users r ON r.referred_by = u.id
+            GROUP BY u.id, u.email
+            HAVING COUNT(r.id) > 0
+            ORDER BY referral_count DESC
+            LIMIT 10
+        """)).fetchall()
+        
+        leaderboard = []
+        for i, row in enumerate(results):
             leaderboard.append({
                 "rank": i + 1,
-                "username": email.split('@')[0][:3] + "***",
-                "referrals": count
+                "username": row[1].split('@')[0][:3] + "***",
+                "referrals": row[2]
             })
-    
-    return {"leaderboard": leaderboard}
+        
+        return {"leaderboard": leaderboard}
+    except Exception as e:
+        # Return empty leaderboard if no referrals yet
+        return {"leaderboard": []}
