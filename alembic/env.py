@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.db.base import Base
 from app.models.user import User
-from app.models.signal import Signal, SignalDelivery
+from app.models.signal import Signal
 from app.core.config import settings
 
 config = context.config
