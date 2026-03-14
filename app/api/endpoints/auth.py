@@ -27,6 +27,14 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
         hashed_pw = get_password_hash(user_data.password)
         logger.info("Password hashed successfully")
         
+        # Look up referrer if referral code provided
+        referred_by_id = None
+        if user_data.referral_code:
+            referrer = db.query(User).filter(User.referral_code == user_data.referral_code).first()
+            if referrer:
+                referred_by_id = referrer.id
+                logger.info(f"User referred by: {referrer.email}")
+        
         user = User(
             email=user_data.email.lower(),
             hashed_password=hashed_pw,
@@ -35,7 +43,8 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
             email_alerts=True,
             push_alerts=True,
             is_active=True,
-            is_verified=True
+            is_verified=True,
+            referred_by=referred_by_id
         )
         
         db.add(user)

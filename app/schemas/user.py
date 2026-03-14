@@ -6,6 +6,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     full_name: Optional[str] = None
+    referral_code: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -26,6 +27,7 @@ class UserResponse(BaseModel):
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
+    referral_code: Optional[str] = None
     email_alerts: Optional[bool] = None
     push_alerts: Optional[bool] = None
 
