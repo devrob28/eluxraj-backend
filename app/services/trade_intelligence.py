@@ -191,6 +191,82 @@ Return ONLY valid JSON with this structure:
 - EXIT (Long): When price moves BELOW SAR dots (dots above candles)
 - Great for trailing stops and trend direction
 
+## ELLIOTT WAVE THEORY
+
+### Impulse Waves (5-Wave Pattern)
+- Wave 1: Initial breakout move, often weak
+- Wave 2: Retracement (50-61.8% of Wave 1), NEVER beyond Wave 1 start
+- Wave 3: STRONGEST wave, usually 1.618x Wave 1, never the shortest
+- Wave 4: Consolidation (38.2% retrace), should not overlap Wave 1 territory
+- Wave 5: Final push, often shows divergence, typically equals Wave 1
+
+### Corrective Waves (ABC Pattern)
+- Wave A: Initial correction against trend
+- Wave B: Counter-trend bounce (often a bull/bear trap)
+- Wave C: Final correction leg, typically equals Wave A
+
+### Elliott Wave Entry Rules
+- BUY: End of Wave 2 (38.2-61.8% retrace of Wave 1)
+- BUY: End of Wave 4 (38.2% retrace of Wave 3)
+- BUY: End of Wave C (correction complete)
+- SELL/TARGET: End of Wave 3 (1.618x extension) or Wave 5
+
+### Wave 3 Extension Targets
+- 1.618x Wave 1 (most common)
+- 2.618x Wave 1 (strong momentum)
+- 4.236x Wave 1 (extreme extension)
+
+## HARMONIC TRADING PATTERNS
+
+### Gartley Pattern (78.6% Retracement)
+- XA: Initial impulse move
+- AB: 61.8% retracement of XA
+- BC: 38.2-88.6% retracement of AB
+- CD: 127.2-161.8% extension of BC
+- D point: 78.6% retracement of XA (ENTRY ZONE)
+- Stop: Beyond X | Target: 38.2% and 61.8% of AD
+
+### Butterfly Pattern (127% Extension)
+- AB: 78.6% retracement of XA
+- BC: 38.2-88.6% retracement of AB
+- CD: 161.8-261.8% extension of BC
+- D point: 127.2-161.8% EXTENSION of XA (beyond X)
+- Larger reversal potential than Gartley
+
+### Bat Pattern (88.6% Retracement)
+- AB: 38.2-50% retracement of XA
+- BC: 38.2-88.6% retracement of AB
+- CD: 161.8-261.8% extension of BC
+- D point: 88.6% retracement of XA (ENTRY ZONE)
+- Tightest stop loss of all harmonics
+
+### Crab Pattern (161.8% Extension)
+- AB: 38.2-61.8% retracement of XA
+- BC: 38.2-88.6% retracement of AB
+- CD: 261.8-361.8% extension of BC
+- D point: 161.8% extension of XA
+- Highest risk/reward harmonic
+
+### Cypher Pattern (78.6% of XC)
+- AB: 38.2-61.8% retracement of XA
+- BC: 113-141.4% extension of AB (goes beyond A)
+- D point: 78.6% retracement of XC
+- Modern pattern with high accuracy
+
+### ABCD Pattern (Simplest Harmonic)
+- AB: Initial leg
+- BC: 61.8-78.6% retracement of AB
+- CD: 127.2-161.8% extension of BC (or CD = AB)
+- ENTRY: When CD equals AB length or hits extension
+- Best pattern for beginners
+
+### Harmonic Trading Rules
+1. Wait for D point completion (PRZ - Potential Reversal Zone)
+2. Look for RSI/MACD divergence at D point
+3. Stop loss just beyond X (Gartley/Bat) or D extreme
+4. Target 1: 38.2% of AD | Target 2: 61.8% of AD
+5. Works best in ranging markets
+
 IMPORTANT: Only identify patterns you can clearly see. If no institutional pattern is present, set confidence below 50 and recommendation to WAIT."""
 
         return await self._call_ai_with_image(prompt, image_data, media_type)
