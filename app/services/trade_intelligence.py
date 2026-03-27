@@ -191,6 +191,178 @@ Return ONLY valid JSON with this structure:
 - EXIT (Long): When price moves BELOW SAR dots (dots above candles)
 - Great for trailing stops and trend direction
 
+## FIBONACCI RETRACEMENTS & EXTENSIONS
+
+### Key Fibonacci Retracement Levels
+- 23.6%: Shallow retracement, strong trend continuation
+- 38.2%: Common retracement in strong trends
+- 50.0%: Psychological level (not true Fibonacci but widely used)
+- 61.8%: Golden ratio - most important level, deep retracement
+- 78.6%: Deep retracement, last defense before trend reversal
+
+### Fibonacci Trading Rules
+- ENTRY (Long): Buy at 38.2%, 50%, or 61.8% retracement of prior upswing
+- ENTRY (Short): Sell at 38.2%, 50%, or 61.8% retracement of prior downswing
+- STOP: Place stop below 78.6% retracement (or beyond swing low/high)
+- TARGETS: Use 127.2%, 161.8%, 261.8% extensions for profit targets
+
+### Fibonacci Extension Targets
+- 127.2%: Conservative target
+- 161.8%: Standard target (golden ratio)
+- 200.0%: Measured move target
+- 261.8%: Extended target in strong trends
+
+## FAIR VALUE GAPS (FVG) / IMBALANCES
+
+### What is a Fair Value Gap?
+- A 3-candle pattern where middle candle creates a gap
+- Bullish FVG: Gap between candle 1 high and candle 3 low (price moved up too fast)
+- Bearish FVG: Gap between candle 1 low and candle 3 high (price moved down too fast)
+- Price tends to return to fill these gaps (rebalancing)
+
+### FVG Trading Rules
+- Identify FVG on higher timeframe (4H, Daily)
+- Wait for price to retrace INTO the FVG zone
+- ENTRY (Long): When price enters bullish FVG from above
+- ENTRY (Short): When price enters bearish FVG from below
+- FVGs act as magnets - price is drawn to fill them
+- Unfilled FVGs = future targets
+
+### FVG Confluence
+- FVG + Order Block = High probability zone
+- FVG + Fibonacci level = Strong confluence
+- FVG in premium/discount zone = Best setups
+
+## SUPPORT & RESISTANCE
+
+### Identifying Key Levels
+- Support: Price level where buying pressure exceeds selling (floor)
+- Resistance: Price level where selling pressure exceeds buying (ceiling)
+- The more times a level is tested, the stronger it becomes
+- Round numbers (100, 150, 200) often act as psychological S/R
+
+### Support & Resistance Trading Rules
+- BUY: At support with confirmation (bullish candle, volume spike)
+- SELL: At resistance with confirmation (bearish candle, rejection wick)
+- BREAKOUT: When price closes above resistance, it becomes support
+- BREAKDOWN: When price closes below support, it becomes resistance
+- Failed breakouts (fakeouts) often lead to strong reversals
+
+### S/R Flip (Polarity)
+- Old resistance becomes new support after breakout
+- Old support becomes new resistance after breakdown
+- Wait for retest of flipped level for entry
+
+## VOLUME ANALYSIS
+
+### Volume Principles
+- Volume confirms price movement
+- High volume + price move = Strong conviction
+- Low volume + price move = Weak/suspicious move
+- Volume precedes price (divergences are warning signs)
+
+### Volume Patterns
+- Climax Volume: Extremely high volume often marks reversals
+- Dry Up: Low volume at support/resistance = potential breakout coming
+- Volume Divergence: Price makes new high but volume decreases = weakness
+- Accumulation: High volume on up days, low volume on down days
+- Distribution: High volume on down days, low volume on up days
+
+### Volume Trading Rules
+- Confirm breakouts with above-average volume (1.5x+ average)
+- Be suspicious of breakouts on low volume
+- Look for volume spike at key S/R levels for reversals
+- Volume climax after extended trend = potential reversal
+
+## SUPPLY AND DEMAND ZONES
+
+### Supply Zone (Selling Pressure)
+- Area where price dropped sharply (institutions sold)
+- Identified by: Strong bearish candle leaving the zone
+- Price often reverses when returning to supply zone
+- Fresh zones (untested) are strongest
+
+### Demand Zone (Buying Pressure)
+- Area where price rallied sharply (institutions bought)
+- Identified by: Strong bullish candle leaving the zone
+- Price often reverses when returning to demand zone
+- Fresh zones (untested) are strongest
+
+### Supply/Demand Trading Rules
+- SELL: When price returns to supply zone (short setup)
+- BUY: When price returns to demand zone (long setup)
+- Use the base candle(s) before the explosive move as the zone
+- Stop loss: Just beyond the zone
+- Zones are "used up" after being tested (strength decreases)
+
+### Zone Quality Factors
+1. Strength of departure (bigger move = stronger zone)
+2. Time spent at zone (less time = stronger imbalance)
+3. Freshness (untested zones are best)
+4. Number of times tested (diminishing strength)
+
+## BREAK OF STRUCTURE (BOS)
+
+### What is Break of Structure?
+- BOS confirms trend continuation
+- Bullish BOS: Price breaks above previous swing high
+- Bearish BOS: Price breaks below previous swing low
+- Confirms that higher highs/lower lows are being made
+
+### BOS Trading Rules
+- Bullish BOS: Look for long entries on pullbacks after the break
+- Bearish BOS: Look for short entries on pullbacks after the break
+- Wait for BOS confirmation before trading with trend
+- Multiple BOS = Strong trend, trade pullbacks aggressively
+
+### BOS vs Liquidity Grab
+- True BOS: Price closes beyond the level with momentum
+- Liquidity Grab: Price spikes beyond level but closes back inside
+- Liquidity grabs often precede reversals
+
+## CHANGE OF CHARACTER (CHOCH / CHoCH)
+
+### What is Change of Character?
+- CHoCH signals potential trend reversal
+- Bullish CHoCH: In downtrend, price breaks above previous swing high
+- Bearish CHoCH: In uptrend, price breaks below previous swing low
+- First sign that trend may be changing
+
+### CHoCH Trading Rules
+- CHoCH is early warning - not immediate entry signal
+- After CHoCH, wait for BOS in new direction to confirm reversal
+- CHoCH + FVG fill = High probability reversal setup
+- CHoCH at key S/R or supply/demand = Stronger signal
+
+### CHoCH vs BOS
+- BOS: Continues existing trend (trend following)
+- CHoCH: Breaks structure against trend (potential reversal)
+- CHoCH requires more confirmation than BOS
+
+## CLASSIC CHART PATTERNS
+
+### Reversal Patterns
+- Head & Shoulders: Three peaks, middle highest → Bearish reversal
+- Inverse Head & Shoulders: Three troughs, middle lowest → Bullish reversal
+- Double Top: Two peaks at same level → Bearish reversal
+- Double Bottom: Two troughs at same level → Bullish reversal
+- Triple Top/Bottom: Three tests of level → Strong reversal signal
+
+### Continuation Patterns
+- Bull Flag: Sharp rally → tight consolidation → continuation up
+- Bear Flag: Sharp drop → tight consolidation → continuation down
+- Ascending Triangle: Flat top, rising lows → Usually breaks up
+- Descending Triangle: Flat bottom, lower highs → Usually breaks down
+- Symmetrical Triangle: Converging trendlines → Breaks either way
+- Wedges: Rising wedge (bearish), Falling wedge (bullish)
+
+### Chart Pattern Trading Rules
+- Measure the pattern height for price target
+- Volume should decrease during pattern formation
+- Volume should spike on breakout
+- Wait for confirmed close beyond pattern boundary
+- Failed patterns often lead to strong moves opposite direction
+
 ## ELLIOTT WAVE THEORY
 
 ### Impulse Waves (5-Wave Pattern)
