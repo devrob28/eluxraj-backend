@@ -13,7 +13,7 @@ from app.core.exceptions import (
     sqlalchemy_exception_handler,
     generic_exception_handler
 )
-from app.api.endpoints import auth, prices, push, playbooks, signals, oracle, alerts, admin, admin_ui, legal, transparency, content, public, marketing, chart_analysis, whale, paper_trading, watchlist, daily_brief, weekly_brief, brokerage, performance, usage, referrals
+from app.api.endpoints import stripe_checkout, auth, prices, push, playbooks, signals, oracle, alerts, admin, admin_ui, legal, transparency, content, public, marketing, chart_analysis, whale, paper_trading, watchlist, daily_brief, weekly_brief, brokerage, performance, usage, referrals
 from app.services.scheduler import start_scheduler, stop_scheduler, get_scheduled_jobs
 
 setup_logging(debug=settings.DEBUG)
@@ -62,6 +62,7 @@ app.include_router(daily_brief.router, prefix="/api/v1/daily-brief", tags=["Dail
 app.include_router(weekly_brief.router, prefix="/api/v1/weekly-brief", tags=["Weekly Brief"])
 app.include_router(brokerage.router, prefix="/api/v1/brokerage", tags=["Brokerage"])
 app.include_router(referrals.router, prefix="/api/v1/referrals", tags=["Referrals"])
+app.include_router(stripe_checkout.router, prefix="/api/v1/stripe", tags=["stripe"])
 app.include_router(performance.router, prefix="/api/v1/performance", tags=["Performance"])
 app.include_router(prices.router, prefix="/api/v1/prices", tags=["Prices"])
 app.include_router(push.router, prefix="/api/v1/push", tags=["Push Notifications"])
