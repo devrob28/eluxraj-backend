@@ -12,10 +12,10 @@ from app.core.logging import logger
 router = APIRouter()
 
 # Simple admin check - in production, use a proper admin role
-ADMIN_EMAILS = ["robmdata@gmail.com", "admin@eluxraj.ai"]
+# Use database is_admin column instead of hardcoded list
 
 async def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.email not in ADMIN_EMAILS:
+    if not getattr(current_user, "is_admin", False):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
