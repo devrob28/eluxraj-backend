@@ -14,7 +14,7 @@ class CheckoutRequest(BaseModel):
 
 @router.post("/create-checkout-session")
 async def create_checkout_session(req: CheckoutRequest):
-    """Create a Stripe Checkout session for $97/month subscription"""
+    """Create a Stripe Checkout session for $98/month subscription"""
     if not stripe.api_key:
         raise HTTPException(status_code=500, detail="Stripe not configured")
     
@@ -38,14 +38,14 @@ async def create_checkout_session(req: CheckoutRequest):
             
             # Check for existing price
             prices = stripe.Price.list(product=product_id, active=True)
-            existing_price = next((p for p in prices.data if p.unit_amount == 9700 and p.recurring), None)
+            existing_price = next((p for p in prices.data if p.unit_amount == 9800 and p.recurring), None)
             
             if existing_price:
                 price_id = existing_price.id
             else:
                 price = stripe.Price.create(
                     product=product_id,
-                    unit_amount=9700,  # $97.00
+                    unit_amount=9800,  # $98.00
                     currency="usd",
                     recurring={"interval": "month"}
                 )
