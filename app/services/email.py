@@ -254,5 +254,75 @@ ELUXRAJ - AI-Powered Trading Signals
         return await self.send_email(to_email, subject, html_content)
 
 
+    async def send_pro_welcome_email(
+        self,
+        to_email: str,
+        reset_url: str,
+        full_name: Optional[str] = None
+    ) -> bool:
+        """Send welcome email to new paying Pro members with password setup link."""
+        
+        subject = "🔥 Welcome to ELUXRAJ Pro — Set Your Password"
+        greeting = full_name.split()[0] if full_name else "Trader"
+        
+        html_content = """
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#0a0a0f;font-family:Arial,sans-serif;">
+    <div style="max-width:600px;margin:0 auto;padding:20px;">
+        <div style="text-align:center;padding:40px 0;">
+            <h1 style="color:#fff;margin:0 0 20px;">Welcome to <span style="background:linear-gradient(135deg,#7c3aed,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">ELUXRAJ PRO</span></h1>
+            <p style="color:#22c55e;font-size:18px;margin:0;font-weight:bold;">✓ Payment confirmed — GREETING_PLACEHOLDER!</p>
+        </div>
+        <div style="background:#12121a;border:1px solid #22c55e;border-radius:16px;padding:30px;margin:20px 0;">
+            <h2 style="color:#fff;margin:0 0 16px;">One last step: set your password</h2>
+            <p style="color:#aaa;line-height:1.7;margin:0 0 24px;">Your Pro account is ready. Click below to set your password and start using your AI Trading Playbooks, Chart AI, and Live Signals immediately.</p>
+            <div style="text-align:center;margin:30px 0;">
+                <a href="RESET_URL_PLACEHOLDER" style="background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;padding:18px 48px;border-radius:12px;text-decoration:none;font-weight:bold;display:inline-block;font-size:16px;">Set My Password →</a>
+            </div>
+            <p style="color:#666;font-size:12px;text-align:center;margin:20px 0 0;">This link expires in 24 hours. If it expires, visit <a href="https://eluxraj.ai/forgot-password.html" style="color:#06b6d4;">forgot-password.html</a> to request a new one.</p>
+        </div>
+        <div style="background:#12121a;border-radius:16px;padding:24px;margin:20px 0;">
+            <h3 style="color:#fff;margin:0 0 12px;font-size:16px;">What\'s unlocked for you:</h3>
+            <ul style="color:#aaa;line-height:2;margin:0;padding-left:20px;">
+                <li>📋 AI Trading Playbooks — complete setups</li>
+                <li>📊 Chart AI — upload any chart, get instant analysis</li>
+                <li>🎯 Live Signals — 50 stocks, scanned every 15 min</li>
+                <li>🔔 Real-time push notifications</li>
+                <li>💬 Elite community access</li>
+            </ul>
+        </div>
+        <div style="text-align:center;padding:20px 0;border-top:1px solid #333;">
+            <p style="color:#666;font-size:12px;">Questions? Reply to this email.</p>
+            <p style="color:#444;font-size:11px;margin:10px 0 0;">ELUXRAJ™ · $98/mo · Cancel anytime from your dashboard</p>
+        </div>
+    </div>
+</body>
+</html>
+""".replace("GREETING_PLACEHOLDER", greeting).replace("RESET_URL_PLACEHOLDER", reset_url)
+        
+        text_content = f"""Welcome to ELUXRAJ Pro!
+
+Your payment is confirmed. Set your password to activate your account:
+
+{reset_url}
+
+This link expires in 24 hours.
+
+Once logged in, you'll have full access to:
+- AI Trading Playbooks
+- Chart AI analysis
+- Live Signals (50 stocks)
+- Real-time alerts
+- Elite community
+
+Questions? Reply to this email.
+
+ELUXRAJ - $98/mo - Cancel anytime
+"""
+        
+        return await self.send_email(to_email, subject, html_content, text_content)
+
+
 # Initialize email service
 email_service = EmailService()

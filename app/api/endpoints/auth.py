@@ -173,19 +173,6 @@ async def reset_password(token: str, new_password: str, db: Session = Depends(ge
     
     return {"ok": True, "message": "Password has been reset successfully"}
 
-@router.post("/admin-reset-password")
-async def admin_reset_password(email: str, new_password: str, db: Session = Depends(get_db)):
-    """Admin endpoint to reset any user's password (TEMPORARY - remove in production)"""
-    user = db.query(User).filter(User.email == email.lower()).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    user.hashed_password = get_password_hash(new_password)
-    db.commit()
-    
-    logger.info(f"Password reset for {email} by admin")
-    return {"ok": True, "message": f"Password reset for {email}"}
-
 
 class UpdatePhoneRequest(BaseModel):
     phone: str

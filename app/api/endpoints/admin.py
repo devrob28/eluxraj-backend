@@ -422,8 +422,8 @@ async def debug_db_tables(
 
 
 @router.post("/migrate-referrals")
-async def migrate_referrals(db: Session = Depends(get_db)):
-    """One-time migration to add referral columns"""
+async def migrate_referrals(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    """One-time migration to add referral columns (admin only)"""
     from sqlalchemy import text
     try:
         db.execute(text('ALTER TABLE users ADD COLUMN referral_code VARCHAR(20) UNIQUE'))
