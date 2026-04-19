@@ -64,7 +64,7 @@ async def get_dashboard_stats(
     # Revenue estimate
     pro_users = tier_counts.get("pro", 0)
     elite_users = tier_counts.get("elite", 0)
-    mrr = (pro_users * 98) + (elite_users * 197)
+    mrr = pro_users * 98
     
     return {
         "users": {
