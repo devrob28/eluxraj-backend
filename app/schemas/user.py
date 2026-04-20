@@ -17,6 +17,7 @@ class UserResponse(BaseModel):
     email: str
     full_name: Optional[str]
     subscription_tier: str
+    is_admin: bool = False
     is_verified: bool
     email_alerts: bool
     push_alerts: bool
