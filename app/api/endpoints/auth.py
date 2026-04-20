@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, UserUpdate
@@ -85,7 +85,7 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
                 detail="Account is deactivated"
             )
         
-        user.last_login = datetime.utcnow()
+        user.last_login = datetime.now(timezone.utc)
         db.commit()
         
         access_token = create_access_token(subject=user.id)
@@ -184,7 +184,7 @@ async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(
     
     # Store token in user record (we'll add this field)
     user.reset_token = reset_token
-    user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
     db.commit()
     
     # Send email
@@ -229,7 +229,7 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
     if not user:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
     
-    if user.reset_token_expires and user.reset_token_expires < datetime.utcnow():
+    if user.reset_token_expires and user.reset_token_expires < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Reset token has expired. Please request a new one.")
     
     # Validate password

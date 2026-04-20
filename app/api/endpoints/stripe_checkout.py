@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import stripe
 import os
 import secrets
@@ -207,7 +207,7 @@ async def _handle_checkout_completed(session: dict, db: Session):
             email_alerts=True,
             push_alerts=True,
             reset_token=reset_token,
-            reset_token_expires=datetime.utcnow() + timedelta(hours=24),
+            reset_token_expires=datetime.now(timezone.utc) + timedelta(hours=24),
         )
         db.add(user)
         db.commit()
@@ -221,7 +221,7 @@ async def _handle_checkout_completed(session: dict, db: Session):
         user.stripe_subscription_id = stripe_subscription_id
         user.is_active = True
         user.reset_token = reset_token
-        user.reset_token_expires = datetime.utcnow() + timedelta(hours=24)
+        user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=24)
         if full_name and not user.full_name:
             user.full_name = full_name
         db.commit()
