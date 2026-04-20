@@ -110,6 +110,47 @@ async def verify_session(session_id: str):
     except stripe.error.StripeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.get("/claim-account/{session_id}")
+async def claim_account(session_id: str, db: Session = Depends(get_db)):
+    """
+    Called by welcome.html after Stripe redirect.
+    Verifies the session is paid and returns a reset_token for inline password setting.
+    """
+    if not stripe.api_key:
+        raise HTTPException(status_code=500, detail="Stripe not configured")
+    
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid session: {e}")
+    
+    if session.payment_status != "paid":
+        raise HTTPException(status_code=402, detail="Payment not completed")
+    
+    customer_details = session.get("customer_details") or {}
+    email = (customer_details.get("email") or session.get("customer_email") or "").lower().strip()
+    
+    if not email:
+        raise HTTPException(status_code=400, detail="Session has no customer email")
+    
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Account still being created. Please wait a moment and refresh.")
+    
+    if not user.reset_token or (user.reset_token_expires and user.reset_token_expires < datetime.now(timezone.utc)):
+        user.reset_token = secrets.token_urlsafe(32)
+        user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=24)
+        db.commit()
+        logger.info(f"Issued fresh reset token for {email} via claim-account")
+    
+    return {
+        "email": email,
+        "full_name": user.full_name,
+        "reset_token": user.reset_token,
+        "tier": user.subscription_tier,
+    }
+
+
 @router.post("/webhook")
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     """
