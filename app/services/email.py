@@ -1,26 +1,26 @@
 import os
 from typing import Optional, List, Dict, Any
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Content, Personalization
+import resend
 from app.core.config import settings
 from app.core.logging import logger
 
 class EmailService:
-    """Email service using SendGrid"""
+    """Email service using Resend"""
     
     def __init__(self):
-        self.api_key = settings.SENDGRID_API_KEY
+        self.api_key = os.getenv("RESEND_API_KEY") or getattr(settings, "RESEND_API_KEY", None)
         self.from_email = settings.FROM_EMAIL
-        self.client = None
+        self.enabled = False
         
         if self.api_key:
-            self.client = SendGridAPIClient(self.api_key)
-            logger.info("✅ Email service initialized")
+            resend.api_key = self.api_key
+            self.enabled = True
+            logger.info(f"Email service initialized (Resend) - from: {self.from_email}")
         else:
-            logger.warning("⚠️ SendGrid API key not set - emails disabled")
+            logger.warning("RESEND_API_KEY not set - emails disabled")
     
     def is_enabled(self) -> bool:
-        return self.client is not None
+        return self.enabled
     
     async def send_email(
         self,
@@ -29,33 +29,33 @@ class EmailService:
         html_content: str,
         text_content: Optional[str] = None
     ) -> bool:
-        """Send a single email"""
-        if not self.is_enabled():
+        """Send a single email via Resend"""
+        if not self.enabled:
             logger.warning("Email not sent - service disabled")
             return False
         
         try:
-            message = Mail(
-                from_email=Email(self.from_email, "ELUXRAJ Signals"),
-                to_emails=To(to_email),
-                subject=subject,
-                html_content=Content("text/html", html_content)
-            )
-            
+            params = {
+                "from": f"ELUXRAJ Signals <{self.from_email}>",
+                "to": [to_email],
+                "subject": subject,
+                "html": html_content,
+            }
             if text_content:
-                message.add_content(Content("text/plain", text_content))
+                params["text"] = text_content
             
-            response = self.client.send(message)
+            response = resend.Emails.send(params)
+            email_id = response.get("id") if isinstance(response, dict) else None
             
-            if response.status_code in [200, 201, 202]:
-                logger.info(f"✅ Email sent to {to_email}")
+            if email_id:
+                logger.info(f"Email sent to {to_email} (resend id: {email_id})")
                 return True
             else:
-                logger.error(f"❌ Email failed: {response.status_code}")
+                logger.error(f"Email send returned no id: {response}")
                 return False
                 
         except Exception as e:
-            logger.error(f"❌ Email error: {e}")
+            logger.error(f"Email error sending to {to_email}: {e}")
             return False
     
     async def send_signal_alert(
