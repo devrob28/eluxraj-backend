@@ -435,31 +435,3 @@ async def migrate_referrals(db: Session = Depends(get_db), admin: User = Depends
         pass
     db.commit()
     return {"status": "migration complete"}
-
-@router.post("/debug/send-test-email")
-async def debug_send_test_email(
-    to: Optional[str] = None,
-    admin: User = Depends(require_admin)
-):
-    """TEMPORARY: sends a test welcome email via Resend. Admin-only.
-    
-    Remove this endpoint after email delivery is verified in production.
-    """
-    from app.services.email import email_service
-    
-    target = to or admin.email
-    
-    if not email_service.is_enabled():
-        raise HTTPException(status_code=503, detail="Email service not enabled")
-    
-    success = await email_service.send_pro_welcome_email(
-        to_email=target,
-        reset_url="https://eluxraj.ai/reset-password.html?token=TEST_DO_NOT_USE",
-        full_name=admin.full_name or "Test Admin",
-    )
-    
-    if success:
-        return {"ok": True, "sent_to": target, "message": "Test email sent successfully"}
-    else:
-        raise HTTPException(status_code=500, detail="Email send failed — check Railway logs")
-
