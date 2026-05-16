@@ -543,6 +543,15 @@ IMPORTANT: Only identify patterns you can clearly see. If no institutional patte
             return self._fallback_analysis()
     
     def _parse_json_response(self, content: str) -> Dict:
+        # Strip markdown code fences (Sonnet often wraps JSON in ```json ... ```)
+        content = content.strip()
+        if content.startswith("```"):
+            # Remove opening fence (```json or ```)
+            content = content.split("\n", 1)[1] if "\n" in content else content[3:]
+        if content.endswith("```"):
+            content = content.rsplit("```", 1)[0]
+        content = content.strip()
+
         """Parse JSON from AI response with multiple fallback strategies"""
         content = content.strip()
         
