@@ -60,12 +60,16 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Simple in-memory rate limiting (use Redis in production)"""
     
-    def __init__(self, app, requests_per_minute: int = 60):
+    def __init__(self, app, requests_per_minute: int = 300):
         super().__init__(app)
         self.requests_per_minute = requests_per_minute
         self.requests = {}  # IP -> list of timestamps
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        # Skip rate limit for chart analysis - Anthropic API credits are the natural cost gate
+        if request.url.path.startswith("/api/v1/chart/analyze"):
+            return await call_next(request)
+        
         client_ip = request.client.host if request.client else "unknown"
         current_time = time.time()
         
