@@ -25,6 +25,12 @@ class RateLimiter:
         """
         tier = tier.lower() if tier else "lite"
         
+        # Admin bypass: treat is_admin users as unlimited
+        from app.models.user import User
+        user_obj = db.query(User).filter(User.id == user_id).first()
+        if user_obj and user_obj.is_admin:
+            tier = "admin"
+        
         # Get limit for this tier/feature
         feature_limits = RATE_LIMITS.get(feature, {})
         limit = feature_limits.get(tier, 0)

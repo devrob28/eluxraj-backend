@@ -32,7 +32,7 @@ RATE_LIMITS = {
     # AI Trade Playbooks - Complete trade setups with entry/exit/stops
     "playbook": {
         "lite": 0,       # No access
-        "pro": 5,        # 5 per day
+        "pro": 9999,    # Unlimited - Pro is the only paid tier        # 5 per day
         "elite": 9999,   # Unlimited
         "admin": 9999,
     },
@@ -40,7 +40,7 @@ RATE_LIMITS = {
     # Chart AI Analysis - Upload chart images for AI analysis
     "chart_analysis": {
         "lite": 0,       # No access
-        "pro": 10,       # 10 per day
+        "pro": 9999,    # Unlimited - Pro is the only paid tier       # 10 per day
         "elite": 9999,   # Unlimited
         "admin": 9999,
     },
@@ -48,7 +48,7 @@ RATE_LIMITS = {
     # Whale Intel - Track smart money movements
     "whale_intel": {
         "lite": 3,       # 3 views per day (teaser)
-        "pro": 50,       # 50 per day
+        "pro": 9999,    # Unlimited - Pro is the only paid tier       # 50 per day
         "elite": 9999,   # Unlimited
         "admin": 9999,
     },
@@ -57,7 +57,7 @@ RATE_LIMITS = {
     # Weekly AI Brief - Comprehensive market analysis
     "weekly_brief": {
         "lite": 0,       # No access
-        "pro": 1,        # 1 per week (it's weekly anyway)
+        "pro": 9999,    # Unlimited - Pro is the only paid tier        # 1 per week (it's weekly anyway)
         "elite": 9999,   # Unlimited
         "admin": 9999,
     },
@@ -65,7 +65,7 @@ RATE_LIMITS = {
     # Custom Alerts - Price/whale/insider alerts
     "alerts": {
         "lite": 1,       # 1 alert
-        "pro": 10,       # 10 alerts
+        "pro": 9999,    # Unlimited - Pro is the only paid tier       # 10 alerts
         "elite": 100,    # 100 alerts
         "admin": 9999,
     },
